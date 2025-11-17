@@ -1,5 +1,9 @@
 # Diffusion Darkroom Gallery
 
+A fast, feature-rich image gallery viewer for AI-generated images with full metadata support.
+
+**Repository:** [https://github.com/juicyroots/diffusion-darkroom](https://github.com/juicyroots/diffusion-darkroom)
+
 I got tired of other web-based image viewers, or opening PNGs in other apps to get metadata and parameter details, so I created this app.
 
 ## Description
