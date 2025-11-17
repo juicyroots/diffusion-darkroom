@@ -1,85 +1,75 @@
-# Diffusion Darkroom Gallery
+# Diffusion Darkroom - Image Gallery - Metadata Viewer
 
-A fast, feature-rich image gallery viewer for AI-generated images with full metadata support.
+A fast, feature-rich image gallery for AI-generated images with full metadata support.
 
 **Repository:** [https://github.com/juicyroots/diffusion-darkroom](https://github.com/juicyroots/diffusion-darkroom)
 
-I got tired of other web-based image viewers, or opening PNGs in other apps to get metadata and parameter details, so I created this app.
+A fast web-based image viewer for quickly viewing AI-generated images and their metadata.
 
 ## Description
 
-A standalone image gallery viewer for AI-generated images. Automatically scans for images and provides a feature-rich viewing experience with full metadata access.
+A standalone image gallery viewer for AI-generated images. Automatically scans folders and sub-folders for images and provides a feature-rich viewing experience with full metadata access. Requires Python to be installed and available in your system PATH. 
 
-## Major Features
+## Gallery Features
+- Masonry layout with intelligent loading, paging, and image recalculations
+- Auto-hiding controls that appear when mouse moves near top or bottom edges, maximizing image viewing space
 
-### Loading Screen
-- Real-time percentage display while images load
-- Gallery visible in background during loading
+## Thumbnail Features
+- **Hover to show info:** Filename, Model, Sampler/Scheduler, Dimensions
+- **Hover to show buttons:** Copy Prompt, Download, Open Image in New Tab
+- **Left-click thumbnail:** Opens image in lightbox (click again to close)
+- **Right-click thumbnail:** View metadata table (click again to close)
+- **Scroll:** Use mouse wheel or click-hold-drag to scroll through images
 
-### Zoom & Pan
-- Click-and-hold to zoom in lightbox
-- Scroll wheel zoom (relative to mouse position)
-- Pan when zoomed by clicking and dragging
-- Click to unzoom
+## Gallery Top Bar
+- **Thumbnail size control:** Adjust size (small, medium, large, huge)
+- **Search bar:** Search by filename and prompt
+- **Sort buttons:** Sort by filename or created date (click again to reverse ascending/descending)
 
-### Navigation
-- Left/right arrow buttons in lightbox
-- Keyboard arrow keys for navigation
-- Click image to open in lightbox
+## Gallery Bottom Bar
+- **Images per page selector:** Choose 50, 100, 250, or 500 images per page
+- **Paging controls:** Navigate between pages with arrow buttons or page numbers
+- **Loading indicator:** Shows progress while images load
+- **Image count:** Displays total number of filtered images
 
-### Scrolling
-- Click-and-hold to scroll through gallery
-- Drag up/down to navigate
+## Lightbox Controls
+- **Zoom:** Click-and-hold to zoom, then move mouse to pan
+- **Scroll zoom:** Mouse wheel zooms relative to cursor position
+- **Navigation:** Left/right arrow buttons or keyboard arrow keys to navigate between images
 
-### Right-Click Parameter Details
-- View full metadata table with AI generation parameters
-- Copy any metadata value with one click
-- Shows Model, Sampler, Prompt, CFG Scale, Seed, dimensions, etc.
-
-### Image Information
-- Filename, model, sampler, and dimensions displayed on each image
-- Metadata automatically extracted from PNG files
-
-### Masonry Layout
-- Images load in columns to maintain the masonry grid layout
-- Row-based loading would break the nice visual layout
-
-### Action Buttons
-- Copy Prompt: Copies AI prompt to clipboard
-- Download: Downloads the image
-- Open: Opens in new browser tab
-
-### Search & Filter
-- Real-time search by filename or model name
-- Image count display
-
-### Sorting
-- Sort by filename or date
-- Ascending/descending toggle
+## Diffusion Parameter Detail Table
+- View full metadata table showing: Prompt, Model, Sampler, Schedule Type, Size, Steps, CFG Scale, LoRAs, etc.
+- Copy any metadata parameter value with a single click
 
 ## Installation
 
-1. Place `gallery.html`, `inject_images.py`, and `launch.bat` in your image folder
-2. Run `launch.bat` (Windows only)
+1. Clone the repository and place `gallery.html`, `inject_images.py`, and `launch.bat` in your image generation output folder.
+2. Run `launch.bat` (Windows only) or run `inject_images.py` directly.
 
-The script scans for images, injects the list into HTML, starts a web server, and opens the gallery.
+The script will:
+- Search the current folder and all sub-folders for images
+- Build a list of image files
+- Inject the image list into the gallery HTML
+- Start a local web server
+- Open the gallery in your default browser 
 
 **Note:** `launch.bat` is Windows-specific. On other operating systems, run `inject_images.py` directly:
+
 ```bash
 python inject_images.py
 ```
 
 ## Requirements
 
-- Windows to run the .bat files, easily modified for another platform
-- Python 3.x (only needed for initial image injection and meta-data extraction)
-- Modern web browser
+- **Windows:** Required to run the `.bat` files (easily modified for other platforms)
+- **Python 3.x:** Required for initial image injection and metadata extraction
+- **Modern web browser:** Chrome, Firefox, Edge, or Safari
 
 ## Standalone Operation
 
 After the initial image injection, the `gallery.html` file is completely standalone and can be opened directly in a browser. However, metadata extraction (right-click parameters) requires a web server due to browser security restrictions. The `inject_images.py` script handles this automatically by starting a local server.
 
-You can run multiple instances in different folders simultaneously - each uses its own port (8000, 8001, etc.).
+You can run multiple instances in different folders simultaneously—each uses its own port (8000, 8001, etc.).
 
 ## Supported Formats
 
