@@ -23,7 +23,7 @@ image_files = []
 for f in os.listdir('.'):
     if os.path.isfile(f):
         ext = os.path.splitext(f)[1].lower()
-        if ext in image_exts and f.lower() != 'ddg.png':
+        if ext in image_exts and f.lower() != 'darkroom.png':
             image_files.append(f)
 
 # Then, check for images in subdirectories
@@ -35,7 +35,7 @@ for folder in os.listdir('.'):
                 image_files.append(f"{folder}/{f}")
 
 # Read the HTML template
-html_file = 'gallery.html'
+html_file = 'darkroom.html'
 if not os.path.exists(html_file):
     print(f"Error: {html_file} not found", file=sys.stderr)
     sys.exit(1)
@@ -86,7 +86,7 @@ Handler = http.server.SimpleHTTPRequestHandler
 httpd = socketserver.TCPServer(("", port), Handler)
 
 # Open browser
-url = f"http://localhost:{port}/gallery.html"
+url = f"http://localhost:{port}/darkroom.html"
 print(f"Opening {url}")
 webbrowser.open(url)
 
