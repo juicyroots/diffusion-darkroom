@@ -4,7 +4,40 @@ A fast, feature-rich image gallery for AI-generated images with full metadata su
 
 ## Description
 
-A standalone web based image gallery viewer for AI-generated images. Automatically scans folders and sub-folders for images and provides a feature-rich viewing experience with full metadata access. Requires Python to be installed and available in your system PATH. 
+A standalone web based image gallery viewer for AI-generated images. Automatically scans folders and sub-folders for images and provides a feature-rich viewing experience with full metadata access. Requires Python to be installed and available in your system PATH.
+
+## Screenshots
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="visuals/masonry-layout.png" alt="Masonry Layout | Thumbnail Size | Search | Sort" width="400"><br>
+        <sub><b>Masonry Layout | Thumbnail Size | Search | Sort</b></sub>
+      </td>
+      <td align="center">
+        <img src="visuals/thumbnail-hover.png" alt="Image Metadata,Copy Prompt, Download Overlay" width="400"><br>
+        <sub><b>Image Metadata | Copy Prompt, Download, & Open Overlay</b></sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="visuals/lightbox-image.png" alt="Lightbox Image | Previous & Next Controls" width="400"><br>
+        <sub><b>Lightbox Image | Metadata | Previous & Next Controls</b></sub>
+      </td>
+      <td align="center">
+        <img src="visuals/paging-controls.png" alt="Loading Bar | Paging Controls" width="400"><br>
+        <sub><b>Loading Bar | Paging Controls | Page Size</b></sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" colspan="2">
+        <img src="visuals/image-metadata.png" alt="Image Metadata Table" width="400"><br>
+        <sub><b>Diffusion Generation Parameters | Image Metadata Table</b></sub>
+      </td>
+    </tr>
+  </table>
+</div> 
 
 ## Gallery Features
 - Masonry layout with intelligent loading, paging, and image recalculations
@@ -69,35 +102,3 @@ You can run multiple instances in different folders simultaneously—each uses i
 ## Supported Formats
 
 PNG, JPG/JPEG, GIF, WebP
-
-## Screenshots
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <img src="visuals/masonry-layout.png" alt="Masonry Layout | Thumbnail Size | Search | Sort" width="300"><br>
-        <sub><b>Masonry Layout | Thumbnail Size | Search | Sort</b></sub>
-      </td>
-      <td align="center">
-        <img src="visuals/thumbnail-hover.png" alt="Image Metadata,Copy Prompt, Download Overlay" width="300"><br>
-        <sub><b>Image Metadata,Copy Prompt, Download Overlay</b></sub>
-      </td>
-      <td align="center">
-        <img src="visuals/lightbox-image.png" alt="Lightbox Image | Previous & Next Controls" width="300"><br>
-        <sub><b>Lightbox Image | Previous & Next Controls</b></sub>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="visuals/paging-controls.png" alt="Loading Bar | Paging Controls" width="300"><br>
-        <sub><b>Loading Bar | Paging Controls</b></sub>
-      </td>
-      <td align="center">
-        <img src="visuals/image-metadata.png" alt="Image Metadata Table" width="300"><br>
-        <sub><b>Image Metadata Table</b></sub>
-      </td>
-      <td></td>
-    </tr>
-  </table>
-</div>
