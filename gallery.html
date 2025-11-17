@@ -1,0 +1,3067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Diffusion Darkroom Gallery</title>
+  <link rel="icon" type="image/png" href="ddg.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      min-height: 100vh;
+      font-family: 'Roboto', sans-serif;
+      background: #000;
+      box-sizing: border-box;
+      overflow-x: hidden;
+    }
+    .gallery {
+      width: 100%;
+      min-height: 100vh;
+      padding: 10px 10px 84px 10px;
+      margin-top: 0;
+      box-sizing: border-box;
+      background: #000;
+      position: relative;
+      transition: padding-top 0.3s ease, margin-top 0.3s ease;
+    }
+    .gallery.top-bar-visible {
+      margin-top: 50px;
+      padding-top: 15px;
+    }
+    .gallery.scrolling {
+      cursor: none !important;
+    }
+    .gallery-column {
+      display: inline-block;
+      vertical-align: top;
+      width: 600px;
+      margin-right: 10px;
+    }
+    .img-container {
+      display: block;
+      position: relative;
+      margin-bottom: 9px;
+      background: transparent;
+      border-radius: 5px;
+      cursor: pointer;
+      break-inside: avoid-column;
+    }
+    .image-wrapper {
+      position: relative;
+      display: block;
+      max-width: 600px;
+      width: 100%;
+      /* This keeps it only as big as the image */
+    }
+    .image-wrapper img {
+      width: 100%;
+      max-width: 600px;
+      display: block;
+      height: auto;
+      border-radius: 4px;
+      background: #fff;
+      border: 1px solid #515151;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      object-fit: contain;
+      position: relative;
+      z-index: 1;
+    }
+    .filename-label {
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      bottom: 1px;
+      font-size: 8pt;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 4px 4px 2px 5px;
+      border-radius: 0 0 5px 5px;
+      pointer-events: none;
+      font-family: 'Roboto', sans-serif;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+      z-index: 1;
+    }
+    .image-buttons {
+      position: absolute;
+      top: 7px;
+      left: 7px;
+      display: flex;
+      gap: 4px;
+      z-index: 3;
+    }
+    .image-button {
+      position: relative;
+      width: 22px;
+      height: 22px;
+      background: rgba(0, 0, 0, 0.2);
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.9;
+      transition: opacity 0.2s, background 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      border:1px solid #4f4f4f;
+      padding: 0;
+    }
+    .image-button:hover {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.85);
+    }
+    .image-button.copied {
+      background: rgba(60, 138, 255, 0.8);
+      opacity: 1;
+    }
+    .image-button svg {
+      width: 14px;
+      height: 14px;
+      fill: #fff;
+    }
+    .image-button::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: calc(100% + 5px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 11px;
+      white-space: nowrap;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      font-family: 'Roboto', sans-serif;
+      z-index: 10;
+    }
+    .image-button:hover::after {
+      opacity: 1;
+    }
+    /* Legacy class names for backwards compatibility */
+    .open-button {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 22px;
+      height: 22px;
+      background: rgba(255, 255, 255, 0.35);
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+      opacity: 0.5;
+      transition: opacity 0.2s, background 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      padding: 0;
+    }
+    .open-button:hover {
+      opacity: 0.7;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .open-button svg {
+      width: 14px;
+      height: 14px;
+      fill: #333;
+    }
+    .copy-prompt-button {
+      position: absolute;
+      top: 7px;
+      left: 7px;
+      width: 22px;
+      height: 22px;
+      background: rgba(255, 255, 255, 0.35);
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+      opacity: 0.5;
+      transition: opacity 0.2s, background 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      padding: 0;
+    }
+    .copy-prompt-button:hover {
+      opacity: 0.7;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .copy-prompt-button.copied {
+      background: rgba(76, 175, 80, 0.6);
+      opacity: 0.8;
+    }
+    .copy-prompt-button svg {
+      width: 14px;
+      height: 14px;
+      fill: #333;
+    }
+    /* ---- Lightbox ---- */
+    .lightbox-overlay {
+      display: none;
+      position: fixed;
+      z-index: 99999;
+      left: 0; top: 0;
+      right: 0; bottom: 0;
+      width: 100%; height: 100vh;
+      background: rgba(0,0,0,0.97);
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+    .lightbox-overlay.active {
+      display: flex;
+    }
+    .lightbox-overlay.hide-cursor {
+      cursor: none !important;
+    }
+    .lightbox-image-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+    .lightbox-img {
+      max-width: 100vw;
+      max-height: 100vh;
+      width: auto;
+      height: auto;
+      border-radius: 5px;
+      background: #fff;
+      border: 1px solid #fff;
+      object-fit: contain;
+      box-shadow: 0 2px 32px #000;
+      z-index: 10;
+      pointer-events: auto;
+      transition: transform 0.2s ease-out;
+    }
+    .lightbox-img.zoomed {
+      transition: none;
+      transform-origin: center center;
+    }
+    .lightbox-img.panning {
+      cursor: none;
+    }
+    .lightbox-filename {
+      font-size: 9pt;
+      color: #fff;
+      background: rgba(0,0,0,.3);
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      max-width: 80%;
+      white-space: nowrap;
+      letter-spacing: 0.03em;
+      pointer-events: none;
+      box-shadow: 0 0 2px #111;
+      opacity: 0.65;
+      z-index: 20;
+    }
+    /* ---- Lightbox Navigation Arrows ---- */
+    .lightbox-nav-arrow {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 100000;
+      opacity: 0.6;
+      transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
+      pointer-events: auto;
+    }
+    .lightbox-nav-arrow.visible {
+      opacity: 0.6;
+      pointer-events: auto;
+    }
+    .lightbox-nav-arrow.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .lightbox-nav-arrow:hover {
+      background: rgba(255, 255, 255, 0.3);
+      opacity: 1;
+      transform: translateY(-50%) scale(1.1);
+    }
+    .lightbox-nav-arrow:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+    .lightbox-nav-arrow.left {
+      left: 20px;
+    }
+    .lightbox-nav-arrow.right {
+      right: 20px;
+    }
+    .lightbox-nav-arrow svg {
+      width: 32px;
+      height: 32px;
+      fill: rgba(255, 255, 255, 0.9);
+    }
+    /* ---- Metadata Modal ---- */
+    .meta-modal {
+      display: none;
+      position: fixed;
+      left: 0; top: 0;
+      right: 0; bottom: 0;
+      width: 100%; height: 100vh;
+      z-index: 999999;
+      background: rgba(0,0,0,0.85);
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+    .meta-modal.active {
+      display: flex;
+    }
+    .meta-table-container {
+      background: #222;
+      border-radius: 6px;
+      box-shadow: 0 4px 32px #000;
+      padding: 24px 32px;
+      color: #fff;
+      max-width: 70vw;
+      max-height: 80vh;
+      overflow: auto;
+      position: relative;
+      cursor: pointer;
+      font-size: 13px;
+      border: none;
+    }
+    .meta-table-container::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .meta-table-container::-webkit-scrollbar-track {
+      background: #111;
+      border-radius: 4px;
+    }
+    .meta-table-container::-webkit-scrollbar-thumb {
+      background: #555;
+      border-radius: 4px;
+    }
+    .meta-table-container::-webkit-scrollbar-thumb:hover {
+      background: #666;
+    }
+    table.meta-table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+      border: none;
+    }
+    table.meta-table td, table.meta-table th {
+      border: none;
+      padding: 6px 12px;
+      vertical-align: top;
+    }
+    table.meta-table th {
+      width: 20%;
+      background: #222;
+      color: #fff;
+      text-align: left;
+      white-space: nowrap;
+      font-weight: normal;
+      border-right: 1px solid #666;
+    }
+    table.meta-table tr {
+      border-bottom: 1px solid #444;
+    }
+    table.meta-table td {
+      width: 80%;
+      word-break: break-word;
+      overflow: hidden;
+      position: relative;
+      color: #7FD4CC; /* Light teal */
+    }
+    .meta-value-wrapper {
+      position: relative;
+      padding-right: 50px;
+      min-height: 20px;
+    }
+    .meta-copy-btn {
+      position: absolute;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      font-size: 8pt;
+      color: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      padding: 1px 4px;
+      cursor: pointer;
+      font-family: 'Roboto', sans-serif;
+      transition: all 0.2s;
+      line-height: 1.2;
+      text-transform: lowercase;
+    }
+    .meta-copy-btn:hover {
+      color: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+    /* ---- Search Bar ---- */
+    .search-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      background: rgba(20, 20, 20, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 0 20px;
+      padding-right: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transform: translateY(-100%);
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      pointer-events: none;
+    }
+    .search-bar.visible {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .image-count {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 11px;
+      font-family: 'Roboto', sans-serif;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .image-count .count-number {
+      font-weight: bold;
+    }
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 250px;
+    }
+    .search-input {
+      width: 100%;
+      height: 32px;
+      padding: 0 36px 0 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      color: #fff;
+      font-size: 12px;
+      font-family: 'Roboto', sans-serif;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.4);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+    }
+    .search-input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      line-height: 1;
+      padding: 0;
+      transition: all 0.2s;
+      z-index: 1;
+    }
+    .search-clear:hover {
+      background: rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .search-clear.visible {
+      display: flex;
+    }
+    /* ---- Sort Buttons ---- */
+    .sort-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .sort-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: all 0.2s;
+      font-size: 10px;
+    }
+    .sort-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .sort-btn.active {
+      background: rgba(255, 255, 255, 0.25);
+      border-color: rgba(255, 255, 255, 0.5);
+      color: rgba(255, 255, 255, 1);
+    }
+    .sort-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+    /* ---- Size Control ---- */
+    .size-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .size-circle {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .size-circle:nth-child(2) {
+      width: 6.67px;
+      height: 6.67px;
+    }
+    .size-circle:nth-child(3) {
+      width: 8.33px;
+      height: 8.33px;
+    }
+    .size-circle:nth-child(4) {
+      width: 10px;
+      height: 10px;
+    }
+    .size-circle:hover {
+      background: rgba(255, 255, 255, 0.5);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+    .size-circle.active {
+      background: rgba(255, 255, 255, 0.8);
+      border-color: rgba(255, 255, 255, 1);
+      box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+    }
+    /* ---- Loading Bar ---- */
+    .loading-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-family: 'Roboto', sans-serif;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .loading-bar-wrapper {
+      width: 120px;
+      height: 12px;
+      border: 1px solid #4a4a4a;
+      border-radius: 4px;
+      background: transparent;
+      overflow: hidden;
+      position: relative;
+    }
+    .loading-bar-fill {
+      height: 100%;
+      background: #9EC5DB;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .loading-percentage {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      white-space: nowrap;
+    }
+    .loading-bar-container.hidden {
+      display: none;
+    }
+    /* ---- Pagination ---- */
+    .pagination {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      background: rgba(20, 20, 20, 0.95);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 12px;
+      z-index: 1000;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+      transform: translateY(100%);
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      pointer-events: none;
+    }
+    .pagination.visible {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .pagination.hidden {
+      display: none;
+    }
+    .pagination-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .pagination-center {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      justify-content: center;
+      min-width: 0;
+    }
+    .pagination-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .pagination.hidden {
+      display: none;
+    }
+    .pagination-arrow {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .pagination-arrow:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .pagination-arrow:active {
+      transform: scale(0.95);
+    }
+    .pagination-arrow svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+    .pagination-numbers {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    .pagination-numbers::-webkit-scrollbar {
+      display: none;
+    }
+    .pagination-numbers {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .pagination-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(40, 40, 40, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 11px;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .pagination-number:hover {
+      background: rgba(60, 60, 60, 0.8);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.8);
+    }
+    .pagination-number.active {
+      background: rgba(80, 80, 80, 0.9);
+      border-color: rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 500;
+    }
+    .pagination-page-size {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pagination-page-size-item {
+      font-size: 11px;
+      font-family: 'Roboto', sans-serif;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .pagination-page-size-item:hover {
+      color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .pagination-page-size-item.active {
+      color: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.15);
+      font-weight: 500;
+    }
+    .pagination-page-size-separator {
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 11px;
+      margin: 0 2px;
+    }
+    .pagination-page-size-standalone {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      height: 40px;
+      background: rgba(20, 20, 20, 0.95);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 12px;
+      z-index: 1000;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+      transform: translateY(100%);
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      pointer-events: none;
+    }
+    .pagination-page-size-standalone.visible {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .pagination-page-size-standalone.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="search-bar">
+    <div class="size-control">
+      <div class="size-circle active" data-size="0.6" title="40% smaller"></div>
+      <div class="size-circle" data-size="0.8" title="20% smaller"></div>
+      <div class="size-circle" data-size="1.0" title="Default size"></div>
+      <div class="size-circle" data-size="1.2" title="20% larger"></div>
+    </div>
+    <div class="search-wrapper">
+      <input type="text" class="search-input" id="searchInput" />
+      <button class="search-clear" id="searchClear" aria-label="Clear search">×</button>
+    </div>
+    <div class="sort-buttons">
+      <button class="sort-btn" id="sortFilename" title="Sort by filename">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </button>
+      <button class="sort-btn" id="sortDate" title="Sort by date">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div class="gallery" id="gallery"></div>
+  <div class="pagination hidden" id="pagination">
+    <div class="pagination-left">
+      <div class="loading-bar-container" id="loadingBarContainer">
+        <div class="loading-bar-wrapper">
+          <div class="loading-bar-fill" id="loadingBarFill"></div>
+        </div>
+        <div class="loading-percentage" id="loadingPercentage">0%</div>
+      </div>
+      <div class="image-count" id="imageCount" style="display: none;">Total Images: <span class="count-number">0</span></div>
+    </div>
+    <div class="pagination-center">
+      <button class="pagination-arrow" id="paginationPrev" aria-label="Previous page">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+        </svg>
+      </button>
+      <div class="pagination-numbers" id="paginationNumbers"></div>
+      <button class="pagination-arrow" id="paginationNext" aria-label="Next page">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="pagination-right">
+      <div class="pagination-page-size" id="paginationPageSize">
+        <span class="pagination-page-size-item" data-size="50">50</span>
+        <span class="pagination-page-size-separator">·</span>
+        <span class="pagination-page-size-item active" data-size="100">100</span>
+        <span class="pagination-page-size-separator">·</span>
+        <span class="pagination-page-size-item" data-size="250">250</span>
+        <span class="pagination-page-size-separator">·</span>
+        <span class="pagination-page-size-item" data-size="500">500</span>
+      </div>
+    </div>
+  </div>
+  <div class="pagination-page-size-standalone hidden" id="paginationPageSizeStandalone">
+    <div class="pagination-page-size">
+      <span class="pagination-page-size-item" data-size="50">50</span>
+      <span class="pagination-page-size-separator">·</span>
+      <span class="pagination-page-size-item active" data-size="100">100</span>
+      <span class="pagination-page-size-separator">·</span>
+      <span class="pagination-page-size-item" data-size="250">250</span>
+      <span class="pagination-page-size-separator">·</span>
+      <span class="pagination-page-size-item" data-size="500">500</span>
+    </div>
+  </div>
+  <div class="lightbox-overlay" id="lightbox">
+    <div class="lightbox-image-container" id="lightboxContainer">
+      <img class="lightbox-img" id="lightboxImg" src="" alt="" />
+      <span class="lightbox-filename" id="lightboxFilename"></span>
+    </div>
+    <button class="lightbox-nav-arrow left" id="lightboxPrev" aria-label="Previous image">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+      </svg>
+    </button>
+    <button class="lightbox-nav-arrow right" id="lightboxNext" aria-label="Next image">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+      </svg>
+    </button>
+  </div>
+  <div class="meta-modal" id="metaModal">
+    <div class="meta-table-container" id="metaTableContainer">
+      <div id="metaTableContent"></div>
+    </div>
+  </div>
+  <script>
+    // Calculate scrollbar width and adjust search bar
+    function getScrollbarWidth() {
+      const outer = document.createElement('div');
+      outer.style.visibility = 'hidden';
+      outer.style.overflow = 'scroll';
+      outer.style.msOverflowStyle = 'scrollbar';
+      outer.style.width = '100px';
+      document.body.appendChild(outer);
+      const inner = document.createElement('div');
+      inner.style.width = '100%';
+      outer.appendChild(inner);
+      const scrollbarWidth = outer.offsetWidth - inner.offsetWidth;
+      outer.parentNode.removeChild(outer);
+      return scrollbarWidth;
+    }
+    
+    // Apply scrollbar width to search bar and pagination bars
+    window.addEventListener('DOMContentLoaded', function() {
+      const scrollbarWidth = getScrollbarWidth();
+      const searchBar = document.querySelector('.search-bar');
+      const pagination = document.querySelector('.pagination');
+      const pageSizeStandalone = document.getElementById('paginationPageSizeStandalone');
+      if (searchBar && scrollbarWidth > 0) {
+        // Add 2px buffer to prevent bleeding into scrollbar
+        searchBar.style.right = `${scrollbarWidth + 2}px`;
+      }
+      if (pagination && scrollbarWidth > 0) {
+        // Add 2px buffer to prevent bleeding into scrollbar
+        pagination.style.right = `${scrollbarWidth + 2}px`;
+      }
+      if (pageSizeStandalone && scrollbarWidth > 0) {
+        // Add 2px buffer to prevent bleeding into scrollbar
+        pageSizeStandalone.style.right = `${scrollbarWidth + 2}px`;
+      }
+    });
+    
+    function escapeFilename(filename) {
+      // For file:// protocol, we need to preserve path separators
+      // Only encode the filename parts, not the path structure
+      const trimmed = filename.trim();
+      // Split by path separators, encode each part, then rejoin
+      const parts = trimmed.split(/[/\\]/);
+      return parts.map(part => encodeURIComponent(part)).join('/');
+    }
+    function removeExtension(filename) {
+      return filename.replace(/\.[^/.]+$/, '');
+    }
+    function getFilenameOnly(path) {
+      // Extract just the filename from a path (handles both / and \)
+      return path.split(/[/\\]/).pop();
+    }
+    async function showLightbox(src, filename, index = -1) {
+      const lightbox = document.getElementById('lightbox');
+      const img = document.getElementById('lightboxImg');
+      const label = document.getElementById('lightboxFilename');
+      
+      // Update current index (use filteredImageFiles for navigation)
+      if (index >= 0) {
+        // Find the index in filteredImageFiles
+        currentLightboxIndex = filteredImageFiles.findIndex(f => f === filename);
+        if (currentLightboxIndex === -1) {
+          // Fallback to allImageFiles if not found in filtered
+          currentLightboxIndex = allImageFiles.findIndex(f => f === filename);
+        }
+      } else {
+        // Find index from filename if not provided
+        currentLightboxIndex = filteredImageFiles.findIndex(f => f === filename);
+        if (currentLightboxIndex === -1) {
+          // Fallback to allImageFiles if not found in filtered
+          currentLightboxIndex = allImageFiles.findIndex(f => f === filename);
+        }
+      }
+      
+      img.src = src;
+      const baseFilename = removeExtension(getFilenameOnly(filename));
+      label.textContent = baseFilename; // Will be updated when metadata loads
+      lightbox.classList.add('active');
+      
+      // Update navigation arrows visibility
+      updateNavArrows();
+      
+      // Reset zoom and pan state
+      zoomActive = false;
+      isPanning = false;
+      currentZoomScale = 1;
+      img.classList.remove('zoomed', 'panning');
+      img.style.transform = '';
+      img.style.transformOrigin = 'center center';
+      
+      // Update label with metadata
+      try {
+        const metadata = await getPngMetadata(src);
+        const displayData = formatMetadataForDisplay(metadata);
+        
+        const parts = [baseFilename];
+        if (displayData['Model']) parts.push(displayData['Model']);
+        if (displayData['Sampler']) parts.push(displayData['Sampler']);
+        if (displayData['Schedule Type']) parts.push(displayData['Schedule Type']);
+        
+        // Add size/dimensions at the end
+        if (displayData['Size']) {
+          parts.push(displayData['Size']);
+        } else if (img.naturalWidth && img.naturalHeight) {
+          // Fallback to actual image dimensions if Size not in metadata
+          parts.push(`${img.naturalWidth}x${img.naturalHeight}`);
+        }
+        
+        label.textContent = parts.join(' · ');
+      } catch (err) {
+        // If metadata extraction fails, keep the base filename
+        label.textContent = baseFilename;
+        // Try to get dimensions from image
+        if (img.naturalWidth && img.naturalHeight) {
+          label.textContent = `${baseFilename} · ${img.naturalWidth}x${img.naturalHeight}`;
+        }
+      }
+      
+      img.onload = function() {
+        resetImageSize();
+      };
+    }
+    
+    function resetImageSize() {
+      const img = document.getElementById('lightboxImg');
+      if (!img || !img.src) return;
+      
+      // Calculate size to fill viewport (height or width, maintaining aspect ratio)
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const viewportAspect = viewportWidth / viewportHeight;
+      
+      if (imgAspect > viewportAspect) {
+        // Image is wider - fit to width
+        img.style.width = viewportWidth + 'px';
+        img.style.height = 'auto';
+      } else {
+        // Image is taller - fit to height
+        img.style.width = 'auto';
+        img.style.height = viewportHeight + 'px';
+      }
+    }
+    function hideLightbox() {
+      const img = document.getElementById('lightboxImg');
+      zoomActive = false;
+      isPanning = false;
+      currentZoomScale = 1;
+      img.classList.remove('zoomed', 'panning');
+      img.style.transform = '';
+      img.style.transformOrigin = 'center center';
+      img.style.width = '';
+      img.style.height = '';
+      img.src = '';
+      document.getElementById('lightbox').classList.remove('active');
+      document.getElementById('lightbox').classList.remove('hide-cursor');
+      currentLightboxIndex = -1;
+      // Hide navigation arrows
+      const prevBtn = document.getElementById('lightboxPrev');
+      const nextBtn = document.getElementById('lightboxNext');
+      prevBtn.classList.remove('visible');
+      prevBtn.classList.add('hidden');
+      nextBtn.classList.remove('visible');
+      nextBtn.classList.add('hidden');
+    }
+    
+    // Navigation functions
+    function updateNavArrows() {
+      // Show/hide arrows based on whether navigation is possible
+      const prevBtn = document.getElementById('lightboxPrev');
+      const nextBtn = document.getElementById('lightboxNext');
+      
+      // Show previous arrow if there's a previous image
+      if (currentLightboxIndex > 0) {
+        prevBtn.classList.add('visible');
+        prevBtn.classList.remove('hidden');
+      } else {
+        prevBtn.classList.remove('visible');
+        prevBtn.classList.add('hidden');
+      }
+      
+      // Show next arrow if there's a next image (use filteredImageFiles)
+      if (currentLightboxIndex >= 0 && currentLightboxIndex < filteredImageFiles.length - 1) {
+        nextBtn.classList.add('visible');
+        nextBtn.classList.remove('hidden');
+      } else {
+        nextBtn.classList.remove('visible');
+        nextBtn.classList.add('hidden');
+      }
+    }
+    
+    function navigateLightbox(direction) {
+      if (currentLightboxIndex < 0) {
+        return;
+      }
+      
+      if (isNavigating) {
+        return;
+      }
+      
+      isNavigating = true; // Set flag to prevent other handlers from closing lightbox
+      
+      let newIndex;
+      if (direction === 'prev') {
+        newIndex = currentLightboxIndex - 1;
+        if (newIndex < 0) {
+          isNavigating = false;
+          return;
+        }
+      } else if (direction === 'next') {
+        newIndex = currentLightboxIndex + 1;
+        if (newIndex >= filteredImageFiles.length) {
+          isNavigating = false;
+          return;
+        }
+      } else {
+        isNavigating = false;
+        return;
+      }
+      
+      const filename = filteredImageFiles[newIndex];
+      showLightbox(escapeFilename(filename), filename, newIndex);
+      
+      // Reset flag after a short delay to allow navigation to complete
+      setTimeout(() => {
+        isNavigating = false;
+      }, 150);
+    }
+    let allImageContainers = [];
+    let allImageFiles = [];
+    let galleryColumns = [];
+    let currentSizeMultiplier = 0.6; // Default size (smallest circle)
+    const baseColumnWidth = 600;
+    let currentLightboxIndex = -1; // Track current image index in lightbox
+    let isNavigating = false; // Flag to prevent closing during navigation
+    let sortState = {
+      filename: null, // null, 'asc', 'desc'
+      date: null
+    };
+    let imageDates = new Map(); // Cache file dates
+    let imageMetadataCache = new Map(); // Cache PNG metadata to avoid re-fetching
+    // Pagination state
+    let currentPage = 1;
+    let imagesPerPage = 100;
+    let filteredImageFiles = []; // Images after filtering
+    let filteredImageContainers = []; // Containers after filtering
+
+    function layoutMasonry() {
+      const gallery = document.getElementById('gallery');
+      if (!gallery) return;
+      
+      // Validate containers exist
+      if (!allImageContainers || allImageContainers.length === 0) {
+        return;
+      }
+      
+      const galleryWidth = gallery.offsetWidth;
+      if (galleryWidth === 0) {
+        // Gallery not visible yet, retry after a short delay
+        setTimeout(layoutMasonry, 100);
+        return;
+      }
+      
+      const columnWidth = baseColumnWidth * currentSizeMultiplier;
+      const columnGap = 10;
+      const numColumns = Math.max(1, Math.floor((galleryWidth + columnGap) / (columnWidth + columnGap)));
+      
+      // Clear existing columns but preserve containers
+      // Remove containers from columns first to avoid DOM issues
+      allImageContainers.forEach(container => {
+        if (container.parentNode) {
+          container.parentNode.removeChild(container);
+        }
+      });
+      
+      gallery.innerHTML = '';
+      galleryColumns = [];
+      
+      // Create columns
+      for (let i = 0; i < numColumns; i++) {
+        const column = document.createElement('div');
+        column.className = 'gallery-column';
+        column.style.width = columnWidth + 'px';
+        column.style.marginRight = (i < numColumns - 1) ? columnGap + 'px' : '0';
+        gallery.appendChild(column);
+        galleryColumns.push({
+          element: column,
+          height: 0
+        });
+      }
+      
+      // Distribute all containers into columns (all containers are visible for current page)
+      allImageContainers.forEach(container => {
+        // Find the shortest column
+        let shortestColumn = galleryColumns[0];
+        let shortestIndex = 0;
+        for (let i = 1; i < galleryColumns.length; i++) {
+          if (galleryColumns[i].height < shortestColumn.height) {
+            shortestColumn = galleryColumns[i];
+            shortestIndex = i;
+          }
+        }
+        
+        // Add container to shortest column
+        shortestColumn.element.appendChild(container);
+        
+        // Force a reflow to ensure layout is calculated
+        void container.offsetHeight;
+        
+        // Calculate height: container height + margin-bottom (9px)
+        // Use offsetHeight for more reliable measurement
+        const containerHeight = container.offsetHeight || container.getBoundingClientRect().height;
+        const marginBottom = 9; // Match CSS margin-bottom
+        const totalHeight = containerHeight + marginBottom;
+        
+        if (totalHeight > 0) {
+          galleryColumns[shortestIndex].height += totalHeight;
+        }
+      });
+    }
+
+    function updateImageCount() {
+      const imageCountEl = document.getElementById('imageCount');
+      if (!imageCountEl) return;
+      
+      // Count total visible images (for pagination, this is filteredImageFiles length)
+      const totalVisible = filteredImageFiles.length;
+      
+      const countNumber = imageCountEl.querySelector('.count-number');
+      if (countNumber) {
+        countNumber.textContent = totalVisible;
+      } else {
+        imageCountEl.innerHTML = `Total Images: <span class="count-number">${totalVisible}</span>`;
+      }
+    }
+    
+    function getTotalPages() {
+      return Math.max(1, Math.ceil(filteredImageFiles.length / imagesPerPage));
+    }
+    
+    function updatePaginationUI() {
+      const pagination = document.getElementById('pagination');
+      const paginationNumbers = document.getElementById('paginationNumbers');
+      const pageSizeStandalone = document.getElementById('paginationPageSizeStandalone');
+      if (!pagination || !paginationNumbers) return;
+      
+      const totalPages = getTotalPages();
+      
+      // Show pagination if more than one page
+      if (totalPages > 1) {
+        pagination.classList.remove('hidden');
+        // Don't add 'visible' class here - let mouse proximity handler manage it
+        if (pageSizeStandalone) {
+          pageSizeStandalone.classList.add('hidden');
+        }
+      } else {
+        pagination.classList.add('hidden');
+        // Show standalone page size selector when pagination is hidden
+        if (pageSizeStandalone) {
+          pageSizeStandalone.classList.remove('hidden');
+          // Don't add 'visible' class here - let mouse proximity handler manage it
+        }
+      }
+      
+      // Clear existing page numbers
+      paginationNumbers.innerHTML = '';
+      
+      // Create page number buttons
+      for (let i = 1; i <= totalPages; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = 'pagination-number';
+        if (i === currentPage) {
+          pageBtn.classList.add('active');
+        }
+        pageBtn.textContent = i;
+        pageBtn.addEventListener('click', () => goToPage(i));
+        paginationNumbers.appendChild(pageBtn);
+      }
+    }
+    
+    function goToPage(page) {
+      const totalPages = getTotalPages();
+      if (page < 1 || page > totalPages) return;
+      
+      // Scroll to top immediately before any content changes
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      
+      currentPage = page;
+      updatePaginationUI();
+      loadCurrentPage();
+      
+      // Scroll again after a brief delay to ensure it sticks
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }, 10);
+    }
+    
+    function goToPreviousPage() {
+      const totalPages = getTotalPages();
+      if (currentPage === 1) {
+        goToPage(totalPages); // Wrap to last page
+      } else {
+        goToPage(currentPage - 1);
+      }
+    }
+    
+    function goToNextPage() {
+      const totalPages = getTotalPages();
+      if (currentPage === totalPages) {
+        goToPage(1); // Wrap to first page
+      } else {
+        goToPage(currentPage + 1);
+      }
+    }
+    
+    function loadCurrentPage() {
+      const gallery = document.getElementById('gallery');
+      if (!gallery) return;
+      
+      // Calculate which images to show for current page
+      const startIndex = (currentPage - 1) * imagesPerPage;
+      const endIndex = Math.min(startIndex + imagesPerPage, filteredImageFiles.length);
+      const pageFiles = filteredImageFiles.slice(startIndex, endIndex);
+      
+      // Show loading bar for page loading
+      const loadingBarContainer = document.getElementById('loadingBarContainer');
+      const loadingBarFill = document.getElementById('loadingBarFill');
+      const loadingPercentage = document.getElementById('loadingPercentage');
+      const imageCountEl = document.getElementById('imageCount');
+      
+      if (loadingBarContainer && pageFiles.length > 0) {
+        loadingBarContainer.classList.remove('hidden');
+        // Force bars to show during loading
+        if (typeof window.updateBarsVisibility === 'function') {
+          window.updateBarsVisibility();
+        }
+        if (imageCountEl) {
+          imageCountEl.style.display = 'none';
+        }
+        // Initialize loading bar to 0%
+        if (loadingBarFill) {
+          loadingBarFill.style.width = '0%';
+        }
+        if (loadingPercentage) {
+          loadingPercentage.textContent = '0%';
+        }
+      }
+      
+      // Track loading progress for this page
+      let pageImagesLoaded = 0;
+      let pageImagesErrored = 0;
+      const totalPageImages = pageFiles.length;
+      
+      function updatePageLoadingProgress() {
+        if (!loadingBarFill || !loadingPercentage) return;
+        const total = pageImagesLoaded + pageImagesErrored;
+        const percentage = totalPageImages > 0 ? Math.round((total / totalPageImages) * 100) : 0;
+        
+        loadingBarFill.style.width = percentage + '%';
+        loadingPercentage.textContent = percentage + '%';
+        
+        // Hide loading bar and show image count when all images are loaded
+        if (total >= totalPageImages && totalPageImages > 0) {
+          setTimeout(() => {
+            if (loadingBarContainer) {
+              loadingBarContainer.classList.add('hidden');
+            }
+            // Update bars after loading completes
+            if (typeof window.updateBarsVisibility === 'function') {
+              window.updateBarsVisibility();
+            }
+            if (imageCountEl) {
+              imageCountEl.style.display = '';
+            }
+          }, 300);
+        }
+      }
+      
+      // Clear gallery and containers completely
+      gallery.innerHTML = '';
+      galleryColumns = [];
+      allImageContainers = [];
+      
+      // Create containers only for current page
+      pageFiles.forEach((filename, pageIndex) => {
+        // Create new container for this image
+        const container = document.createElement('div');
+        container.className = 'img-container';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'image-wrapper';
+        wrapper.style.maxWidth = (baseColumnWidth * currentSizeMultiplier) + 'px';
+
+        const img = document.createElement('img');
+        img.style.maxWidth = (baseColumnWidth * currentSizeMultiplier) + 'px';
+        // Don't use lazy loading for current page - we want to track all images loading
+        // img.loading = 'lazy'; // Removed - causes loading bar to get stuck
+        
+        const baseFilename = removeExtension(getFilenameOnly(filename));
+        const label = document.createElement('span');
+        label.className = 'filename-label';
+        label.textContent = baseFilename;
+
+        // Queue metadata extraction
+        let imageLoadHandled = false; // Prevent double-counting
+        const handleImageLoad = () => {
+          if (imageLoadHandled) return; // Prevent double-counting
+          imageLoadHandled = true;
+          pageImagesLoaded++;
+          updatePageLoadingProgress();
+          metadataQueue.push({ img, label, baseFilename, copyPromptBtn, container });
+          processMetadataQueue();
+          
+          // Recalculate layout after image loads (in case dimensions changed)
+          // Use a debounced layout to avoid too many recalculations
+          if (typeof window.layoutMasonryTimeout === 'undefined') {
+            window.layoutMasonryTimeout = null;
+          }
+          clearTimeout(window.layoutMasonryTimeout);
+          window.layoutMasonryTimeout = setTimeout(() => {
+            layoutMasonry();
+          }, 50);
+        };
+        
+        const handleImageError = function() {
+          if (imageLoadHandled) return; // Prevent double-counting
+          imageLoadHandled = true;
+          pageImagesErrored++;
+          updatePageLoadingProgress();
+          container.innerHTML =
+            '<div style="padding:12px;color:#c00;">Failed to load: ' + filename + '</div>';
+        };
+        
+        img.onerror = handleImageError;
+
+        // Create button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'image-buttons';
+
+        // 1st button: Copy Prompt
+        const copyPromptBtn = document.createElement('button');
+        copyPromptBtn.className = 'image-button';
+        copyPromptBtn.setAttribute('data-label', 'Copy Prompt');
+        copyPromptBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+        copyPromptBtn.style.display = 'none';
+        copyPromptBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const prompt = this.dataset.prompt;
+          if (prompt) {
+            navigator.clipboard.writeText(prompt).then(() => {
+              this.classList.add('copied');
+              setTimeout(() => {
+                this.classList.remove('copied');
+              }, 2000);
+            }).catch(err => {
+              console.error('Failed to copy:', err);
+            });
+          }
+        });
+
+        // 2nd button: Download
+        const downloadBtn = document.createElement('button');
+        downloadBtn.className = 'image-button';
+        downloadBtn.setAttribute('data-label', 'Download');
+        downloadBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>';
+        downloadBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const a = document.createElement('a');
+          a.href = img.src;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        });
+
+        // 3rd button: Open in new window
+        const openButton = document.createElement('button');
+        openButton.className = 'image-button';
+        openButton.setAttribute('data-label', 'Open');
+        openButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 19H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h5c.55 0 1-.45 1-1s-.45-1-1-1H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-5c0-.55-.45-1-1-1s-1 .45-1 1v5c0 .55-.45 1-1 1zM14 4c0 .55.45 1 1 1h2.59l-9.13 9.13c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0L19 6.41V9c0 .55.45 1 1 1s1-.45 1-1V4c0-.55-.45-1-1-1h-5c-.55 0-1 .45-1 1z"/></svg>';
+        openButton.addEventListener('click', function(e) {
+          e.stopPropagation();
+          window.open(img.src, '_blank');
+        });
+
+        buttonContainer.appendChild(copyPromptBtn);
+        buttonContainer.appendChild(downloadBtn);
+        buttonContainer.appendChild(openButton);
+
+        // Set src after setting up handlers to avoid race conditions
+        img.src = escapeFilename(filename);
+        
+        // Check if image is already loaded (for cached images)
+        // Use setTimeout to ensure handlers are attached first
+        setTimeout(() => {
+          if (img.complete && img.naturalWidth > 0) {
+            // Image already loaded (cached)
+            handleImageLoad();
+          } else if (img.complete && img.naturalWidth === 0) {
+            // Image failed to load
+            handleImageError();
+          } else {
+            // Wait for image to load
+            img.addEventListener('load', handleImageLoad, { once: true });
+            img.addEventListener('error', handleImageError, { once: true });
+          }
+        }, 0);
+        
+        // Add a timeout fallback to prevent getting stuck
+        // If image hasn't loaded/errored after 10 seconds, mark it as errored
+        setTimeout(() => {
+          if (!imageLoadHandled) {
+            console.warn('Image load timeout:', filename);
+            handleImageError();
+          }
+        }, 10000);
+
+        wrapper.appendChild(img);
+        wrapper.appendChild(label);
+        wrapper.appendChild(buttonContainer);
+        container.appendChild(wrapper);
+
+        container.addEventListener('click', function(e) {
+          const index = startIndex + pageIndex; // Index in filteredImageFiles
+          showLightbox(img.src, filename, index);
+          e.stopPropagation();
+        });
+
+        // Add to containers array (layoutMasonry will handle adding to DOM)
+        allImageContainers.push(container);
+      });
+      
+      // Layout masonry with the new containers
+      // Wait for images to start loading before layout
+      // Use multiple requestAnimationFrame calls to ensure images have dimensions
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          layoutMasonry();
+          
+          // After layout, wait a bit more for images to load and recalculate
+          setTimeout(() => {
+            // Recalculate layout once more after images have loaded
+            layoutMasonry();
+          }, 100);
+        });
+      });
+      
+      // Force scroll to top after layout
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          // Also try scrolling the gallery element itself if it's scrollable
+          const gallery = document.getElementById('gallery');
+          if (gallery) {
+            gallery.scrollTop = 0;
+          }
+        });
+      });
+    }
+
+    function filterImages(searchQuery) {
+      const searchInput = document.getElementById('searchInput');
+      const currentQuery = searchQuery || (searchInput ? searchInput.value : '');
+      
+      // Reset to page 1 when filtering
+      currentPage = 1;
+      
+      if (currentQuery.length < 2) {
+        // Show all images if search is less than 2 characters
+        filteredImageFiles = [...allImageFiles];
+      } else {
+        const query = currentQuery.toLowerCase();
+        filteredImageFiles = [];
+        
+        // Filter based on filenames (we can't check modelName until images are loaded)
+        allImageFiles.forEach((filename) => {
+          const filenameOnly = getFilenameOnly(filename).toLowerCase();
+          if (filenameOnly.includes(query)) {
+            filteredImageFiles.push(filename);
+          }
+        });
+        
+        // Also check currently loaded containers for model name matches
+        // This allows filtering by model name for images that are currently on the page
+        allImageContainers.forEach((container) => {
+          const modelName = (container.dataset.modelName || '').toLowerCase();
+          if (modelName.includes(query)) {
+            // Find the filename for this container
+            const img = container.querySelector('img');
+            if (img && img.src) {
+              // Extract filename from src
+              const srcPath = decodeURIComponent(img.src);
+              const filename = allImageFiles.find(f => srcPath.includes(f));
+              if (filename && !filteredImageFiles.includes(filename)) {
+                filteredImageFiles.push(filename);
+              }
+            }
+          }
+        });
+      }
+      
+      // Update pagination UI
+      updatePaginationUI();
+      
+      // Update image count
+      updateImageCount();
+      
+      // Load current page (will create containers for filtered images)
+      loadCurrentPage();
+    }
+
+    // Metadata extraction queue with concurrency limit
+    let metadataQueue = [];
+    let activeMetadataExtractions = 0;
+    const MAX_CONCURRENT_METADATA = 5; // Limit concurrent metadata fetches
+    
+    function processMetadataQueue() {
+      if (metadataQueue.length === 0 || activeMetadataExtractions >= MAX_CONCURRENT_METADATA) {
+        return;
+      }
+      
+      const { img, label, baseFilename, copyPromptBtn, container } = metadataQueue.shift();
+      activeMetadataExtractions++;
+      
+      getPngMetadata(img.src)
+        .then(metadata => {
+          const displayData = formatMetadataForDisplay(metadata);
+          const parts = [baseFilename];
+          if (displayData['Model']) parts.push(displayData['Model']);
+          if (displayData['Sampler']) parts.push(displayData['Sampler']);
+          if (displayData['Schedule Type']) parts.push(displayData['Schedule Type']);
+          
+          // Add size/dimensions at the end
+          if (displayData['Size']) {
+            parts.push(displayData['Size']);
+          } else if (img.naturalWidth && img.naturalHeight) {
+            // Fallback to actual image dimensions if Size not in metadata
+            parts.push(`${img.naturalWidth}x${img.naturalHeight}`);
+          }
+          
+          label.textContent = parts.join(' · ');
+          
+          // Store model name in container for search
+          if (container && displayData['Model']) {
+            container.dataset.modelName = displayData['Model'];
+            // Re-run search if there's an active search query to update results
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && searchInput.value.length >= 2) {
+              filterImages();
+            }
+          }
+          
+          // Store prompt for copy button
+          if (displayData['Prompt'] && copyPromptBtn) {
+            copyPromptBtn.dataset.prompt = displayData['Prompt'];
+            copyPromptBtn.style.display = 'flex';
+          }
+        })
+        .catch(err => {
+          // If metadata extraction fails, keep the base filename
+          label.textContent = baseFilename;
+          // Try to get dimensions from image
+          if (img.naturalWidth && img.naturalHeight) {
+            label.textContent = `${baseFilename} · ${img.naturalWidth}x${img.naturalHeight}`;
+          }
+        })
+        .finally(() => {
+          activeMetadataExtractions--;
+          // Process next item in queue
+          if (metadataQueue.length > 0) {
+            setTimeout(processMetadataQueue, 0);
+          }
+        });
+    }
+
+    // Embedded image list - injected by inject_image_list.py
+    // IMAGE_LIST_PLACEHOLDER
+    const embeddedImageList = [
+  "images/00030-62184363.png",
+  "images/Aor-001.jpg",
+  "images/Aor-002.jpg",
+  "images/Aor-003.jpg",
+  "images/Aor-004.jpg",
+  "images/Aor-005.jpg",
+  "images/Aor-006.jpg",
+  "images/Aor-007.jpg",
+  "images/Aor-008.jpg",
+  "images/Aor-009.jpg",
+  "images/Aor-010.jpg",
+  "images/Aor-011.jpg",
+  "images/Aor-012.jpg",
+  "images/Aor-013.jpg",
+  "images/Aor-014.jpg",
+  "images/Aor-015.jpg",
+  "images/Aor-016.jpg",
+  "images/Aor-017.jpg",
+  "images/Aor-018.jpg",
+  "images/Aor-019.jpg",
+  "images/Aor-020.jpg",
+  "images/Aor-021.jpg",
+  "images/Aor-022.jpg",
+  "images/Aor-023.jpg",
+  "images/Aor-024.jpg",
+  "images/Aor-025.jpg",
+  "images/Aor-026.jpg",
+  "images/Aor-027.jpg",
+  "images/Aor-028.jpg",
+  "images/Aor-029.jpg",
+  "images/Aor-030.jpg",
+  "images/Aor-031.jpg",
+  "images/Aor-032.jpg",
+  "images/Aor-033.jpg",
+  "images/Aor-034.jpg",
+  "images/Aor-035.jpg",
+  "images/Aor-036.jpg",
+  "images/Aor-037.jpg",
+  "images/Aor-038.jpg",
+  "images/Aor-039.jpg",
+  "images/Aor-040.jpg",
+  "images/Aor-041.jpg",
+  "images/Aor-042.jpg",
+  "images/Aor-043.jpg",
+  "images/Aor-044.jpg",
+  "images/Aor-045.jpg",
+  "images/Aor-046.jpg",
+  "images/Aor-047.jpg",
+  "images/Aor-048.jpg",
+  "images/Aor-049.jpg",
+  "images/Aor-050.jpg",
+  "images/Aor-051.jpg",
+  "images/Aor-052.jpg",
+  "images/Aor-053.jpg",
+  "images/Aor-054.jpg",
+  "images/Aor-055.jpg",
+  "images/Aor-056.jpg",
+  "images/Aor-057.jpg",
+  "images/Aor-058.jpg",
+  "images/Aor-059.jpg",
+  "images/Aor-060.jpg",
+  "images/Aor-061.jpg",
+  "images/Aor-062.jpg",
+  "images/Aor-063.jpg",
+  "images/Aor-064.jpg",
+  "images/Aor-065.jpg",
+  "images/Aor-066.jpg",
+  "images/Aor-067.jpg",
+  "images/Aor-068.jpg",
+  "images/Aor-069.jpg",
+  "images/Aor-070.jpg",
+  "images/Aor-071.jpg",
+  "images/Aor-072.jpg",
+  "images/Aor-073.jpg",
+  "images/Aor-074.jpg",
+  "images/Aor-075.jpg",
+  "images/Aor-076.jpg",
+  "images/Aor-077.jpg",
+  "images/Aor-078.jpg",
+  "images/Aor-079.jpg",
+  "images/Aor-080.jpg",
+  "images/Aor-081.jpg",
+  "images/Aor-082.jpg",
+  "images/Aor-083.jpg",
+  "images/Aor-084.jpg",
+  "images/Aor-085.jpg",
+  "images/Aor-086.jpg",
+  "images/Aor-087.jpg",
+  "images/Aor-088.jpg",
+  "images/Aor-089.jpg",
+  "images/Aor-090.jpg",
+  "images/Aor-091.jpg",
+  "images/Aor-092.jpg",
+  "images/Aor-093.jpg",
+  "images/Aor-094.jpg",
+  "images/Aor-095.jpg",
+  "images/Aor-096.jpg",
+  "images/Aor-097.jpg",
+  "images/Aor-098.jpg",
+  "images/Aor-099.jpg",
+  "images/Aor-100.jpg",
+  "images/Aor-101.jpg",
+  "images/Aor-102.jpg",
+  "images/Aor-103.jpg",
+  "images/Aor-104.jpg",
+  "images/Aor-105.jpg",
+  "images/Aor-106.jpg",
+  "images/Aor-107.jpg",
+  "images/Aor-108.jpg",
+  "images/Aor-109.jpg",
+  "images/Aor-110.jpg",
+  "images/Aor-111.jpg",
+  "images/Aor-112.jpg",
+  "images/Aor-113.jpg",
+  "images/Aor-114.jpg",
+  "images/Aor-115.jpg",
+  "images/Aor-116.jpg",
+  "images/Aor-117.jpg",
+  "images/Aor-118.jpg",
+  "images/Aor-119.jpg",
+  "images/Aor-120.jpg",
+  "images/Aor-121.jpg",
+  "images/Aor-122.jpg",
+  "images/Aor-123.jpg",
+  "images/Aor-124.jpg",
+  "images/Aor-125.jpg",
+  "images/Aor-126.jpg",
+  "images/Aor-127.jpg",
+  "images/Aor-128.jpg",
+  "images/Aor-129.jpg",
+  "images/Aor-130.jpg",
+  "images/Aor-131.jpg",
+  "images/Aor-132.jpg",
+  "images/Aor-133.jpg",
+  "images/Aor-134.jpg",
+  "images/Aor-135.jpg",
+  "images/Aor-136.jpg",
+  "images/Aor-137.jpg",
+  "images/Aor-138.jpg",
+  "images/Aor-139.jpg",
+  "images/Aor-140.jpg",
+  "images/Aor-141.jpg",
+  "images/Aor-142.jpg",
+  "images/Aor-143.jpg",
+  "images/Aor-144.jpg",
+  "images/Aor-145.jpg",
+  "images/Aor-146.jpg",
+  "images/Aor-147.jpg",
+  "images/Aor-148.jpg",
+  "images/Aor-149.jpg",
+  "images/Aor-150.jpg",
+  "images/Aor-151.jpg",
+  "images/Aor-152.jpg",
+  "images/Aor-153.jpg",
+  "images/Aor-154.jpg",
+  "images/Aor-155.jpg",
+  "images/Aor-156.jpg",
+  "images/Aor-157.jpg",
+  "images/Aor-158.jpg",
+  "images/Aor-159.jpg",
+  "images/Aor-160.jpg",
+  "images/Aor-161.jpg",
+  "images/Aor-162.jpg",
+  "images/Aor-163.jpg",
+  "images/Aor-164.jpg",
+  "images/Aor-165.jpg",
+  "images/Aor-166.jpg",
+  "images/Aor-167.jpg",
+  "images/Aor-168.jpg",
+  "images/Aor-169.jpg",
+  "images/Aor-170.jpg",
+  "images/Aor-171.jpg",
+  "images/Aor-172.jpg",
+  "images/Aor-173.jpg",
+  "images/Aor-174.jpg",
+  "images/Aor-175.jpg",
+  "images/Aor-176.jpg",
+  "images/Aor-177.jpg",
+  "images/Aor-178.jpg",
+  "images/Aor-179.jpg",
+  "images/Aor-180.jpg",
+  "images/Aor-181.jpg",
+  "images/Aor-182.jpg",
+  "images/Aor-183.jpg",
+  "images/Aor-184.jpg",
+  "images/Aor-185.jpg",
+  "images/Aor-186.jpg",
+  "images/Aor-187.jpg",
+  "images/Aor-188.jpg",
+  "images/Aor-189.jpg",
+  "images/Aor-190.jpg",
+  "images/Aor-191.jpg",
+  "images/Aor-192.jpg",
+  "images/Aor-193.jpg",
+  "images/Aor-194.jpg",
+  "images/Aor-195.jpg",
+  "images/Aor-196.jpg",
+  "images/Aor-197.jpg",
+  "images/Aor-198.jpg",
+  "images/Aor-199.jpg",
+  "images/Aor-200.jpg",
+  "images/tmpoksptphy.png",
+  "images/tmprgh8xccj.png",
+  "images/tmpzqgs13d5.png",
+  "images/Upscale_00023_.png",
+  "images/Upscale_00038_.png",
+  "images/Upscale_00039_.png",
+  "images/Upscale_00040_.png",
+  "images/Upscale_00041_.png"
+];
+    
+    // Use embedded image list directly
+    (function() {
+      allImageFiles = embeddedImageList;
+        const gallery = document.getElementById('gallery');
+        gallery.innerHTML = '';
+        allImageContainers = [];
+        
+        // Initialize image count
+        updateImageCount();
+        
+        // Initialize pagination - don't create all images upfront
+        const totalImages = allImageFiles.length;
+        
+        // Initialize filtered arrays (all images initially)
+        filteredImageFiles = [...allImageFiles];
+        filteredImageContainers = []; // Will be populated as pages are loaded
+        
+        // Initialize pagination UI
+        updatePaginationUI();
+        
+        // Load first page (this will create images for first page only and show loading bar)
+        // The loadCurrentPage function will handle showing/hiding the loading bar
+        loadCurrentPage();
+        
+        // Update image count
+        setTimeout(updateImageCount, 100);
+
+        // Set up pagination arrow handlers
+        const paginationPrev = document.getElementById('paginationPrev');
+        const paginationNext = document.getElementById('paginationNext');
+        if (paginationPrev) {
+          paginationPrev.addEventListener('click', goToPreviousPage);
+        }
+        if (paginationNext) {
+          paginationNext.addEventListener('click', goToNextPage);
+        }
+        
+        // Set up page size selector (both in pagination bar and standalone)
+        function setupPageSizeSelector(container) {
+          const pageSizeItems = container.querySelectorAll('.pagination-page-size-item');
+          pageSizeItems.forEach(item => {
+            item.addEventListener('click', function() {
+              const newSize = parseInt(this.getAttribute('data-size'));
+              if (newSize !== imagesPerPage) {
+                imagesPerPage = newSize;
+                // Update active state in both containers
+                document.querySelectorAll('.pagination-page-size-item').forEach(i => {
+                  if (parseInt(i.getAttribute('data-size')) === newSize) {
+                    i.classList.add('active');
+                  } else {
+                    i.classList.remove('active');
+                  }
+                });
+                // Reset to page 1
+                currentPage = 1;
+                // Update pagination UI first (this updates page count)
+                updatePaginationUI();
+                // Then reload images with new page size
+                loadCurrentPage();
+                
+                // Force scroll to top - use multiple methods to ensure it works
+                window.scrollTo(0, 0);
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+              }
+            });
+          });
+        }
+        
+        // Set up page size selectors
+        const paginationPageSize = document.getElementById('paginationPageSize');
+        const paginationPageSizeStandalone = document.getElementById('paginationPageSizeStandalone');
+        if (paginationPageSize) {
+          setupPageSizeSelector(paginationPageSize.parentElement);
+        }
+        if (paginationPageSizeStandalone) {
+          setupPageSizeSelector(paginationPageSizeStandalone);
+        }
+        
+        // Set up auto-hide/show for top and bottom bars based on mouse proximity
+        const searchBar = document.querySelector('.search-bar');
+        const pagination = document.getElementById('pagination');
+        const pageSizeStandalone = document.getElementById('paginationPageSizeStandalone');
+        const PROXIMITY_THRESHOLD = 150; // pixels from top/bottom edge
+        
+        let mouseY = 0;
+        let showBarsTimeout = null;
+        
+        // Make updateBarsVisibility accessible from loadCurrentPage
+        window.updateBarsVisibility = function() {
+          const windowHeight = window.innerHeight;
+          const nearTop = mouseY <= PROXIMITY_THRESHOLD;
+          const nearBottom = mouseY >= windowHeight - PROXIMITY_THRESHOLD;
+          const gallery = document.getElementById('gallery');
+          const loadingBarContainer = document.getElementById('loadingBarContainer');
+          
+          // Check if loading is in progress
+          const isCurrentlyLoading = loadingBarContainer && !loadingBarContainer.classList.contains('hidden');
+          
+          // Show/hide top bar (always show if loading)
+          let topBarVisible = false;
+          if (searchBar) {
+            if (nearTop || isCurrentlyLoading) {
+              searchBar.classList.add('visible');
+              topBarVisible = true;
+            } else {
+              searchBar.classList.remove('visible');
+            }
+          }
+          
+          // Show/hide bottom bars (always show if loading)
+          let bottomBarVisible = false;
+          if (pagination && !pagination.classList.contains('hidden')) {
+            if (nearBottom || isCurrentlyLoading) {
+              pagination.classList.add('visible');
+              bottomBarVisible = true;
+            } else {
+              pagination.classList.remove('visible');
+            }
+          }
+          
+          if (pageSizeStandalone && !pageSizeStandalone.classList.contains('hidden')) {
+            if (nearBottom || isCurrentlyLoading) {
+              pageSizeStandalone.classList.add('visible');
+              bottomBarVisible = true;
+            } else {
+              pageSizeStandalone.classList.remove('visible');
+            }
+          }
+          
+          // Update gallery spacing - only add margin-top when top bar is visible
+          if (gallery) {
+            if (topBarVisible) {
+              gallery.classList.add('top-bar-visible');
+            } else {
+              gallery.classList.remove('top-bar-visible');
+            }
+          }
+        }
+        
+        // Track mouse position
+        document.addEventListener('mousemove', function(e) {
+          mouseY = e.clientY;
+          updateBarsVisibility();
+          
+          // Clear any existing timeout
+          if (showBarsTimeout) {
+            clearTimeout(showBarsTimeout);
+          }
+        });
+        
+        // Hide bars when mouse leaves window (with delay)
+        document.addEventListener('mouseleave', function() {
+          showBarsTimeout = setTimeout(() => {
+            if (searchBar) {
+              searchBar.classList.remove('visible');
+            }
+            if (pagination) {
+              pagination.classList.remove('visible');
+            }
+            if (pageSizeStandalone) {
+              pageSizeStandalone.classList.remove('visible');
+            }
+          }, 1000); // Hide after 1 second of mouse leaving
+        });
+        
+        // Show bars when mouse enters window
+        document.addEventListener('mouseenter', function() {
+          if (showBarsTimeout) {
+            clearTimeout(showBarsTimeout);
+            showBarsTimeout = null;
+          }
+          updateBarsVisibility();
+        });
+        
+        // Initial check on page load - show bars if mouse is already near edges
+        // Use a small delay to ensure DOM is ready
+        setTimeout(() => {
+          updateBarsVisibility();
+        }, 100);
+        
+        // Set up search input listener
+        const searchInput = document.getElementById('searchInput');
+        const searchClear = document.getElementById('searchClear');
+        
+        function updateClearButton() {
+          if (searchInput.value.length > 0) {
+            searchClear.classList.add('visible');
+          } else {
+            searchClear.classList.remove('visible');
+          }
+        }
+        
+        searchInput.addEventListener('input', function(e) {
+          filterImages(e.target.value);
+          updateClearButton();
+        });
+        
+        // Clear button click handler
+        searchClear.addEventListener('click', function(e) {
+          e.preventDefault();
+          searchInput.value = '';
+          filterImages('');
+          updateClearButton();
+          searchInput.focus();
+        });
+        
+        // Handle window resize
+        let resizeTimeout;
+        window.addEventListener('resize', function() {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(layoutMasonry, 100);
+        });
+    })();
+
+    // Size control handlers
+    function updateImageSizes() {
+      const newMaxWidth = baseColumnWidth * currentSizeMultiplier;
+      allImageContainers.forEach(container => {
+        const wrapper = container.querySelector('.image-wrapper');
+        const img = container.querySelector('img');
+        if (wrapper) wrapper.style.maxWidth = newMaxWidth + 'px';
+        if (img) img.style.maxWidth = newMaxWidth + 'px';
+      });
+      
+      // Wait for browser to recalculate layout after size change
+      // Use double requestAnimationFrame to ensure layout is recalculated
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          layoutMasonry();
+        });
+      });
+    }
+
+    document.querySelectorAll('.size-circle').forEach((circle, index) => {
+      circle.addEventListener('click', function() {
+        // Remove active class from all circles
+        document.querySelectorAll('.size-circle').forEach(c => c.classList.remove('active'));
+        // Add active class to clicked circle
+        this.classList.add('active');
+        // Update size multiplier
+        currentSizeMultiplier = parseFloat(this.getAttribute('data-size'));
+        // Update all images and relayout
+        updateImageSizes();
+      });
+    });
+
+    // Sort functionality
+    async function getFileDate(filename) {
+      if (imageDates.has(filename)) {
+        return imageDates.get(filename);
+      }
+      
+      try {
+        // Use fetch with HEAD request (works with http:// protocol)
+        const response = await fetch(escapeFilename(filename), { method: 'HEAD' });
+        const lastModified = response.headers.get('Last-Modified');
+        if (lastModified) {
+          const date = new Date(lastModified);
+          imageDates.set(filename, date);
+          return date;
+        }
+      } catch (err) {
+        // Fallback on error
+      }
+      
+      // Fallback to current date if we can't get the file date
+      const date = new Date();
+      imageDates.set(filename, date);
+      return date;
+    }
+
+    function updateSortButtonIcons() {
+      const filenameBtn = document.getElementById('sortFilename');
+      const dateBtn = document.getElementById('sortDate');
+      
+      // Update filename button
+      if (sortState.filename) {
+        filenameBtn.classList.add('active');
+        const svg = filenameBtn.querySelector('svg');
+        if (sortState.filename === 'asc') {
+          svg.innerHTML = '<path d="M7 10l5 5 5-5z"/>'; // Down arrow
+        } else {
+          svg.innerHTML = '<path d="M7 14l5-5 5 5z"/>'; // Up arrow
+        }
+      } else {
+        filenameBtn.classList.remove('active');
+        filenameBtn.querySelector('svg').innerHTML = '<path d="M7 10l5 5 5-5z"/>';
+      }
+      
+      // Update date button
+      if (sortState.date) {
+        dateBtn.classList.add('active');
+        const svg = dateBtn.querySelector('svg');
+        // Calendar icon with arrow overlay
+        if (sortState.date === 'asc') {
+          svg.innerHTML = '<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/><path d="M7 10l5 5 5-5z" transform="translate(5,12)"/>';
+        } else {
+          svg.innerHTML = '<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/><path d="M7 14l5-5 5 5z" transform="translate(5,12)"/>';
+        }
+      } else {
+        dateBtn.classList.remove('active');
+        dateBtn.querySelector('svg').innerHTML = '<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>';
+      }
+    }
+
+    async function sortByFilename() {
+      // Toggle sort direction
+      if (sortState.filename === null || sortState.filename === 'desc') {
+        sortState.filename = 'asc';
+        sortState.date = null; // Clear other sort
+      } else {
+        sortState.filename = 'desc';
+      }
+      
+      // Create array of indices with filenames for sorting
+      const indices = allImageFiles.map((filename, index) => ({
+        index,
+        filename: getFilenameOnly(filename).toLowerCase()
+      }));
+      
+      // Sort
+      indices.sort((a, b) => {
+        if (sortState.filename === 'asc') {
+          return a.filename.localeCompare(b.filename);
+        } else {
+          return b.filename.localeCompare(a.filename);
+        }
+      });
+      
+      // Reorder arrays
+      const newFiles = indices.map(item => allImageFiles[item.index]);
+      
+      allImageFiles = newFiles;
+      
+      // Update filtered arrays if no active filter
+      const searchInput = document.getElementById('searchInput');
+      if (!searchInput || searchInput.value.length < 2) {
+        filteredImageFiles = [...allImageFiles];
+      }
+      
+      // Reset to page 1 and update pagination
+      currentPage = 1;
+      updateSortButtonIcons();
+      updatePaginationUI();
+      loadCurrentPage();
+    }
+
+    async function sortByDate() {
+      // Toggle sort direction
+      if (sortState.date === null || sortState.date === 'desc') {
+        sortState.date = 'asc';
+        sortState.filename = null; // Clear other sort
+      } else {
+        sortState.date = 'desc';
+      }
+      
+      updateSortButtonIcons();
+      
+      // Fetch dates for all images (with batching to avoid overwhelming)
+      const BATCH_SIZE = 10;
+      const indices = allImageFiles.map((filename, index) => ({ index, filename }));
+      
+      // Fetch dates in batches
+      for (let i = 0; i < indices.length; i += BATCH_SIZE) {
+        const batch = indices.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (item) => {
+          item.date = await getFileDate(item.filename);
+        }));
+      }
+      
+      // Sort by date
+      indices.sort((a, b) => {
+        const dateA = a.date.getTime();
+        const dateB = b.date.getTime();
+        if (sortState.date === 'asc') {
+          return dateA - dateB;
+        } else {
+          return dateB - dateA;
+        }
+      });
+      
+      // Reorder arrays
+      const newFiles = indices.map(item => allImageFiles[item.index]);
+      
+      allImageFiles = newFiles;
+      
+      // Update filtered arrays if no active filter
+      const searchInput = document.getElementById('searchInput');
+      if (!searchInput || searchInput.value.length < 2) {
+        filteredImageFiles = [...allImageFiles];
+      }
+      
+      // Reset to page 1 and update pagination
+      currentPage = 1;
+      updatePaginationUI();
+      loadCurrentPage();
+    }
+
+    // Set up sort button handlers
+    document.getElementById('sortFilename').addEventListener('click', sortByFilename);
+    document.getElementById('sortDate').addEventListener('click', sortByDate);
+
+    // --- Click-and-Hold Zoom with Panning ---
+    let zoomActive = false;
+    let isPanning = false;
+    let mouseDownTime = 0;
+    let mouseDownTimer = null;
+    let initialClickX = 0;
+    let initialClickY = 0;
+    let panStartX = 0;
+    let panStartY = 0;
+    let panOffsetX = 0;
+    let panOffsetY = 0;
+    let currentZoomScale = 1; // Track current zoom scale
+    const HOLD_THRESHOLD = 200; // milliseconds to trigger zoom
+    const MIN_ZOOM = 1; // Minimum zoom (100%)
+    const MAX_ZOOM = 5; // Maximum zoom (500%)
+    const ZOOM_STEP = 0.1; // Zoom increment per wheel step
+    
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    
+    // Handle mouse down - start click-and-hold detection
+    lightboxImg.addEventListener('mousedown', function(e) {
+      if (!lightbox.classList.contains('active')) return;
+      
+      // Ignore right-clicks (button 2) - let contextmenu handle it
+      if (e.button === 2) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      mouseDownTime = Date.now();
+      initialClickX = e.clientX;
+      initialClickY = e.clientY;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      
+      // If already zoomed, start panning immediately
+      if (zoomActive) {
+        isPanning = true;
+        lightboxImg.classList.add('panning');
+        lightbox.classList.add('hide-cursor');
+        return;
+      }
+      
+      // Otherwise, start timer for click-and-hold zoom
+      mouseDownTimer = setTimeout(function() {
+        if (!zoomActive) {
+          zoomActive = true;
+          isPanning = true;
+          lightboxImg.classList.add('zoomed', 'panning');
+          lightbox.classList.add('hide-cursor');
+          
+          // Zoom to 200% centered on initial click position
+          // Recalculate rect to ensure accuracy
+          const rect = lightboxImg.getBoundingClientRect();
+          const imgX = initialClickX - rect.left;
+          const imgY = initialClickY - rect.top;
+          const originX = Math.max(0, Math.min(100, (imgX / rect.width) * 100));
+          const originY = Math.max(0, Math.min(100, (imgY / rect.height) * 100));
+          
+          lightboxImg.style.transformOrigin = `${originX}% ${originY}%`;
+          currentZoomScale = 3.0;
+          lightboxImg.style.transform = `scale(${currentZoomScale})`;
+          
+          // Initialize pan offset
+          panOffsetX = 0;
+          panOffsetY = 0;
+          panStartX = initialClickX;
+          panStartY = initialClickY;
+        }
+      }, HOLD_THRESHOLD);
+    });
+    
+    // Handle mouse move - pan when zoomed
+    lightboxImg.addEventListener('mousemove', function(e) {
+      if (!zoomActive || !isPanning) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const deltaX = e.clientX - panStartX;
+      const deltaY = e.clientY - panStartY;
+      
+      // Accumulate pan offset
+      panOffsetX += deltaX;
+      panOffsetY += deltaY;
+      
+      // Apply transform with pan using current zoom scale
+      lightboxImg.style.transform = `scale(${currentZoomScale}) translate(${panOffsetX}px, ${panOffsetY}px)`;
+      
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+    });
+    
+    // Handle mouse up - end panning or trigger click-to-close
+    lightboxImg.addEventListener('mouseup', function(e) {
+      // Ignore right-clicks (button 2)
+      if (e.button === 2) return;
+      
+      // Don't close if clicking on navigation arrows
+      if (e.target.closest('.lightbox-nav-arrow')) {
+        return;
+      }
+      
+      e.stopPropagation();
+      
+      if (mouseDownTimer) {
+        clearTimeout(mouseDownTimer);
+        mouseDownTimer = null;
+      }
+      
+      const clickDuration = Date.now() - mouseDownTime;
+      
+      if (isPanning && zoomActive) {
+        // End panning and unzoom - return to full size
+        isPanning = false;
+        zoomActive = false;
+        currentZoomScale = 1;
+        lightboxImg.classList.remove('panning', 'zoomed');
+        lightbox.classList.remove('hide-cursor');
+        lightboxImg.style.transform = '';
+        lightboxImg.style.transformOrigin = 'center center';
+        panOffsetX = 0;
+        panOffsetY = 0;
+        resetImageSize();
+      } else if (clickDuration < HOLD_THRESHOLD && !isNavigating) {
+        // Quick click - close lightbox (works for both zoomed and unzoomed)
+        // But only if we're not in the middle of rapid navigation
+        hideLightbox();
+      }
+    });
+    
+    // Handle mouse leave - end panning and unzoom if zoomed
+    lightboxImg.addEventListener('mouseleave', function() {
+      if (mouseDownTimer) {
+        clearTimeout(mouseDownTimer);
+        mouseDownTimer = null;
+      }
+      if (isPanning && zoomActive) {
+        // End panning and unzoom - return to full size
+        isPanning = false;
+        zoomActive = false;
+        currentZoomScale = 1;
+        lightboxImg.classList.remove('panning', 'zoomed');
+        lightbox.classList.remove('hide-cursor');
+        lightboxImg.style.transform = '';
+        lightboxImg.style.transformOrigin = 'center center';
+        panOffsetX = 0;
+        panOffsetY = 0;
+        resetImageSize();
+      } else if (isPanning) {
+        isPanning = false;
+        lightboxImg.classList.remove('panning');
+        lightbox.classList.remove('hide-cursor');
+      }
+    });
+    
+    // Click on overlay (not image) to close
+    lightbox.addEventListener('click', function(e) {
+      // Don't close if navigating or clicking on navigation arrows
+      if (isNavigating || e.target.closest('.lightbox-nav-arrow')) {
+        e.stopPropagation();
+        return;
+      }
+      
+      // Only close if clicking on the overlay itself or the image container
+      // But not on the image itself (image clicks are handled separately)
+      if (e.target === lightbox || e.target.classList.contains('lightbox-image-container')) {
+        hideLightbox();
+      }
+    });
+    
+    // Keyboard navigation and close
+    document.addEventListener('keydown', function(e) {
+      if (lightbox.classList.contains('active')) {
+        if (e.key === 'Escape') {
+          hideLightbox();
+        } else if (e.key === 'ArrowLeft') {
+          navigateLightbox('prev');
+        } else if (e.key === 'ArrowRight') {
+          navigateLightbox('next');
+        }
+      }
+    });
+    
+    // Navigation button click handlers - use capture phase to fire first
+    const prevBtn = document.getElementById('lightboxPrev');
+    const nextBtn = document.getElementById('lightboxNext');
+    
+    // Handle navigation clicks - must fire before lightbox click handler
+    function handleNavClick(direction, e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      // Navigate
+      navigateLightbox(direction);
+      
+      return false;
+    }
+    
+    // Use capture phase so these fire BEFORE the lightbox click handler
+    prevBtn.addEventListener('click', function(e) {
+      handleNavClick('prev', e);
+    }, true);
+    
+    nextBtn.addEventListener('click', function(e) {
+      handleNavClick('next', e);
+    }, true);
+    
+    // Arrows are now always visible when navigation is possible
+    // No need for mouse position tracking
+    
+    // Scroll wheel zoom - only when lightbox is active
+    lightboxImg.addEventListener('wheel', function(e) {
+      if (!lightbox.classList.contains('active')) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Determine zoom direction
+      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+      const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoomScale + delta));
+      
+      // Only update if scale actually changed
+      if (newScale === currentZoomScale) return;
+      
+      // Get mouse position relative to image
+      const rect = lightboxImg.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Calculate zoom origin as percentage
+      const originX = (mouseX / rect.width) * 100;
+      const originY = (mouseY / rect.height) * 100;
+      
+      // Update zoom scale
+      currentZoomScale = newScale;
+      
+      // If zooming in, activate zoom state
+      if (currentZoomScale > 1 && !zoomActive) {
+        zoomActive = true;
+        lightboxImg.classList.add('zoomed');
+      }
+      
+      // If zooming back to 1x, deactivate zoom state
+      if (currentZoomScale <= 1 && zoomActive) {
+        zoomActive = false;
+        lightboxImg.classList.remove('zoomed');
+        lightboxImg.style.transformOrigin = 'center center';
+        panOffsetX = 0;
+        panOffsetY = 0;
+        resetImageSize();
+        return;
+      }
+      
+      // Apply zoom with transform origin at mouse cursor
+      lightboxImg.style.transformOrigin = `${originX}% ${originY}%`;
+      lightboxImg.style.transform = `scale(${currentZoomScale}) translate(${panOffsetX}px, ${panOffsetY}px)`;
+    });
+
+    // --- PNG Metadata Extraction for Stable Diffusion ---
+    async function getPngMetadata(url){
+      // Check cache first
+      if (imageMetadataCache.has(url)) {
+        return imageMetadataCache.get(url);
+      }
+      
+      // Use fetch (works with http:// protocol from local server)
+      // Fallback to XMLHttpRequest if fetch fails
+      let buf;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        buf = await response.arrayBuffer();
+      } catch (err) {
+        // Fallback to XMLHttpRequest
+        buf = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', url, true);
+          xhr.responseType = 'arraybuffer';
+          xhr.onload = function() {
+            if (xhr.status === 0 || xhr.status === 200) {
+              resolve(xhr.response);
+            } else {
+              reject(new Error(`Failed to load: ${xhr.status}`));
+            }
+          };
+          xhr.onerror = function() {
+            reject(new Error('Network error'));
+          };
+          xhr.ontimeout = function() {
+            reject(new Error('Request timeout'));
+          };
+          xhr.timeout = 10000; // 10 second timeout
+          xhr.send();
+        });
+      }
+      
+      const bytes = new Uint8Array(buf);
+      let i = 8;
+      let metadata = {};
+      while(i < bytes.length){
+        let length = (
+          (bytes[i]<<24) |
+          (bytes[i+1]<<16) |
+          (bytes[i+2]<<8 ) |
+          (bytes[i+3])
+        )>>>0;
+        let type = String.fromCharCode(...bytes.slice(i+4,i+8));
+        if(['tEXt','iTXt','zTXt'].includes(type)){
+          let chunkData = bytes.slice(i+8, i+8+length);
+          let text = "";
+          try {
+            text = new TextDecoder("utf-8").decode(chunkData);
+          } catch(e) {
+            text = String.fromCharCode(...chunkData);
+          }
+          let keyword, value;
+          if(type==="iTXt"){
+            let nul = text.indexOf('\x00',9);
+            keyword = text.slice(0, nul);
+            value = text.slice(nul+1);
+          } else {
+            let nul = text.indexOf('\x00');
+            keyword = text.slice(0, nul);
+            value = text.slice(nul+1);
+          }
+          if (keyword && value) metadata[keyword] = value;
+        }
+        i += 8+length+4;
+      }
+      // Cache the metadata for future use
+      imageMetadataCache.set(url, metadata);
+      return metadata;
+    }
+
+    // --- AI Image Generation Parameters Parser ---
+    // This function parses the "parameters" field from PNG metadata
+    // It handles inconsistent formatting with commas in prompts
+    function parseAIParameters(parametersText) {
+      if (!parametersText) return {};
+      
+      const result = {};
+      
+      // List of parameter names we're looking for (in order of appearance, case-insensitive)
+      // Longer names first to avoid partial matches
+      const parameterNames = [
+        'Hires Distilled CFG Scale',
+        'Distilled CFG Scale',
+        'Hires CFG Scale',
+        'Schedule type',
+        'Negative prompt',
+        'Hires upscaler',
+        'Hires upscale',
+        'Hires steps',
+        'Hires prompt',
+        'Model hash',
+        'Denoising strength',
+        'CFG scale',
+        'Clip skip',
+        'Sampler',
+        'Steps',
+        'Seed',
+        'Size',
+        'Model',
+        'Version',
+        'RNG',
+        'Lora hashes'
+      ];
+      
+      // Remove "parameters" keyword if present at the start
+      let text = parametersText.replace(/^parameters\s*/i, '').trim();
+      
+      // Find the position of "Negative prompt:" to separate positive prompt
+      const negativePromptMatch = text.match(/Negative prompt\s*:/i);
+      const negativePromptIndex = negativePromptMatch ? negativePromptMatch.index : -1;
+      
+      if (negativePromptIndex > 0) {
+        // Extract positive prompt (everything before "Negative prompt:")
+        let positivePrompt = text.substring(0, negativePromptIndex).trim();
+        if (positivePrompt) {
+          result['Prompt'] = positivePrompt;
+        }
+      } else {
+        // Check if text starts directly with a known parameter
+        let startsWithParam = false;
+        for (const param of parameterNames) {
+          const regex = new RegExp(`^${param.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`, 'i');
+          if (regex.test(text)) {
+            startsWithParam = true;
+            break;
+          }
+        }
+        // If it doesn't start with a parameter, it's likely the positive prompt
+        if (!startsWithParam && text) {
+          // But check if there's a parameter later - if so, only take text up to first parameter
+          let firstParamIndex = text.length;
+          for (const param of parameterNames) {
+            const regex = new RegExp(`\\b${param.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`, 'i');
+            const match = text.match(regex);
+            if (match && match.index < firstParamIndex) {
+              firstParamIndex = match.index;
+            }
+          }
+          if (firstParamIndex < text.length) {
+            result['Prompt'] = text.substring(0, firstParamIndex).trim();
+          } else {
+            result['Prompt'] = text;
+          }
+        }
+      }
+      
+      // Extract Loras from the entire text (format: <lora:name:weight>)
+      // Deduplicate to avoid showing the same lora multiple times
+      const loraMatches = text.match(/<lora:[^>]+>/gi);
+      if (loraMatches && loraMatches.length > 0) {
+        // Remove duplicates by converting to Set and back to array
+        const uniqueLoras = [...new Set(loraMatches)];
+        result['Loras'] = uniqueLoras.join(' ');
+      }
+      
+      // Parse parameter: value pairs
+      // Strategy: Find ALL parameter-like patterns (any text followed by colon, possibly preceded by comma, newline, or >)
+      // This helps us identify boundaries even for parameters we don't care about
+      const allParamMatches = [];
+      
+      // Find all patterns that look like parameters: ", ParameterName:" or "ParameterName:" at start
+      // Also matches after newlines or > (for parameters after Loras)
+      // Pattern: optional comma+whitespace, newline+whitespace, or >+whitespace, then parameter name, then colon
+      const paramPattern = /(?:^|,\s*|\n\s*|>\s*)([^:]+?)\s*:/g;
+      let match;
+      while ((match = paramPattern.exec(text)) !== null) {
+        const paramName = match[1].trim();
+        const fullMatch = match[0];
+        // Adjust index to skip leading comma, newline, or >
+        let indexOffset = 0;
+        if (fullMatch.startsWith(',')) {
+          indexOffset = 1;
+        } else if (fullMatch.startsWith('\n') || fullMatch.startsWith('>')) {
+          // Find where the actual parameter name starts (after whitespace)
+          const nameStart = fullMatch.search(/\S/);
+          indexOffset = nameStart >= 0 ? nameStart : 0;
+        }
+        const index = match.index + indexOffset;
+        
+        allParamMatches.push({
+          name: paramName,
+          index: index,
+          colonIndex: match.index + match[0].length - 1, // Position of the colon
+          fullMatch: fullMatch
+        });
+      }
+      
+      // Now extract values for parameters we care about
+      for (const paramName of parameterNames) {
+        // Find all occurrences of this parameter (case-insensitive)
+        for (let i = 0; i < allParamMatches.length; i++) {
+          const match = allParamMatches[i];
+          
+          // Check if this match is our parameter (case-insensitive)
+          if (match.name.toLowerCase() !== paramName.toLowerCase()) {
+            continue;
+          }
+          
+          // Find the start of the value (after the colon)
+          let valueStart = match.colonIndex + 1;
+          // Skip whitespace after colon
+          while (valueStart < text.length && /\s/.test(text[valueStart])) {
+            valueStart++;
+          }
+          
+          // Find the end of the value
+          // The value ends at the comma before the next parameter, or at the end of text
+          let valueEnd = text.length;
+          
+          // Look for the next parameter match (any parameter, not just ones we care about)
+          for (let j = i + 1; j < allParamMatches.length; j++) {
+            const nextMatch = allParamMatches[j];
+            // The value ends at the comma before the next parameter
+            // Find the last comma before this next parameter
+            const commaBeforeNext = text.lastIndexOf(',', nextMatch.index);
+            if (commaBeforeNext > valueStart) {
+              valueEnd = commaBeforeNext;
+              break;
+            }
+            // If no comma found, the value might extend to the next parameter start
+            // But typically there should be a comma, so let's use the next param index
+            if (nextMatch.index > valueStart) {
+              valueEnd = nextMatch.index;
+              break;
+            }
+          }
+          
+          let value = text.substring(valueStart, valueEnd).trim();
+          // Remove trailing comma if present
+          value = value.replace(/,\s*$/, '').trim();
+          
+          if (value) {
+            // Map parameter name to display name
+            const displayKey = paramName === 'Negative prompt' ? 'Negative Prompt' : 
+                             paramName === 'CFG scale' ? 'CFG Scale' :
+                             paramName === 'Distilled CFG Scale' ? 'Distilled CFG Scale' :
+                             paramName === 'Schedule type' ? 'Schedule Type' :
+                             paramName === 'Hires CFG Scale' ? 'Hires CFG Scale' :
+                             paramName === 'Hires upscaler' ? 'Hires Upscaler' :
+                             paramName === 'Denoising strength' ? 'Denoising Strength' :
+                             paramName === 'Clip skip' ? 'Clip Skip' :
+                             paramName;
+            
+            // Skip ADetailer parameters
+            if (!displayKey.toLowerCase().includes('adetailer') && 
+                !paramName.toLowerCase().includes('adetailer')) {
+              // Store the value (overwrite if already exists - take the first occurrence)
+              if (!result[displayKey]) {
+                result[displayKey] = value;
+              }
+            }
+          }
+        }
+      }
+      
+      return result;
+    }
+
+    // --- Format and Display Metadata ---
+    function formatMetadataForDisplay(rawMetadata) {
+      const displayData = {};
+      
+      // Parse parameters if present
+      if (rawMetadata.parameters) {
+        const parsed = parseAIParameters(rawMetadata.parameters);
+        Object.assign(displayData, parsed);
+      }
+      
+      // The parser already returns properly formatted keys, so we can use them directly
+      // Just filter to only the fields we want to display
+      const allowedFields = [
+        'Prompt', 'Negative Prompt', 'Model', 'Sampler', 'Schedule Type', 
+        'Size', 'Steps', 'Hires steps', 'CFG Scale', 'Distilled CFG Scale', 'Denoising Strength',
+        'Hires CFG Scale', 'Hires Upscaler', 'Seed', 'Clip Skip', 'Loras', 'Created Date'
+      ];
+      
+      const finalData = {};
+      for (const key of allowedFields) {
+        if (displayData[key] !== undefined) {
+          finalData[key] = displayData[key];
+        }
+      }
+      
+      return finalData;
+    }
+
+    async function showMetaTable(metadata, imageSrc){
+      const modal = document.getElementById('metaModal');
+      const container = document.getElementById('metaTableContent');
+      
+      if(!metadata || Object.keys(metadata).length==0){
+        container.innerHTML = "<b>No metadata found.</b>";
+      } else {
+        // Parse and format the metadata
+        const displayData = formatMetadataForDisplay(metadata);
+        
+        // Add created date if we have image source
+        if (imageSrc) {
+          try {
+            const date = await getFileDate(imageSrc);
+            displayData['Created Date'] = date.toLocaleString();
+          } catch (err) {
+            // If date fetch fails, skip it
+          }
+        }
+        
+        if (Object.keys(displayData).length === 0) {
+          container.innerHTML = "<b>No AI generation parameters found.</b>";
+        } else {
+          let rows = "";
+          // Display in a specific order
+          const displayOrder = [
+            'Prompt', 'Negative Prompt', 'Model', 'Sampler', 'Schedule Type', 
+            'Size', 'Steps', 'CFG Scale', 'Distilled CFG Scale', 'Seed',
+            'Hires Upscaler', 'Denoising Strength', 'Hires steps',
+            'Hires CFG Scale', 'Clip Skip', 'Loras', 'Created Date'
+          ];
+          
+          for (const key of displayOrder) {
+            if (displayData[key] !== undefined) {
+              const value = String(displayData[key]);
+              const escapedValue = escapeHtml(value);
+              // Store raw value in data attribute, properly escaped for HTML attribute
+              const dataValue = value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              rows += `<tr><th>${escapeHtml(key)}</th><td><div class="meta-value-wrapper">${escapedValue}<button class="meta-copy-btn" data-value="${dataValue}">copy</button></div></td></tr>`;
+            }
+          }
+          
+          container.innerHTML = `<table class="meta-table">${rows}</table>`;
+          
+          // Add copy button handlers
+          container.querySelectorAll('.meta-copy-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+              e.stopPropagation(); // Prevent closing the modal
+              let value = this.getAttribute('data-value');
+              // Decode HTML entities
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = value;
+              value = tempDiv.textContent || tempDiv.innerText || value;
+              navigator.clipboard.writeText(value).then(() => {
+                // Visual feedback
+                const originalText = this.textContent;
+                this.textContent = 'copied!';
+                setTimeout(() => {
+                  this.textContent = originalText;
+                }, 1000);
+              }).catch(err => {
+                console.error('Failed to copy:', err);
+              });
+            });
+          });
+        }
+      }
+      modal.classList.add('active');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML.replace(/\n/g, '<br>');
+    }
+    // Close modal on any click (including inside the table)
+    document.getElementById('metaModal').onclick = function(e){
+      this.classList.remove('active');
+    };
+    document.addEventListener('contextmenu', async function(e){
+      const img = e.target.closest('img');
+      if(!img) return;
+      e.preventDefault();
+      try {
+        const metadata = await getPngMetadata(img.src);
+        showMetaTable(metadata, img.src);
+      } catch (err) {
+        console.error('Failed to load metadata:', err);
+        // Show error message in modal
+        const modal = document.getElementById('metaModal');
+        const container = document.getElementById('metaTableContent');
+        container.innerHTML = "<b>Failed to load metadata. The image may not be accessible or may not contain metadata.</b>";
+        modal.classList.add('active');
+      }
+    });
+    
+    // Click-and-hold scrolling for main gallery
+    let galleryScrolling = false;
+    let galleryScrollStartY = 0;
+    let galleryScrollStartScroll = 0;
+    let galleryHasScrolled = false;
+    
+    function setupGalleryScrolling() {
+      const gallery = document.getElementById('gallery');
+      if (!gallery) {
+        console.log('Gallery not found for scrolling setup');
+        return;
+      }
+      
+      console.log('Setting up gallery scrolling');
+      
+      gallery.addEventListener('mousedown', function(e) {
+        // Only handle left clicks
+        if (e.button !== 0) return;
+        
+        // Ignore clicks on buttons and links only
+        if (e.target.closest('button') || e.target.closest('a')) {
+          return;
+        }
+        
+        console.log('Gallery mousedown - starting scroll');
+        
+        // Start scrolling - works on images and empty space
+        galleryScrolling = true;
+        galleryHasScrolled = false;
+        galleryScrollStartY = e.clientY;
+        // Get current scroll position - try multiple methods
+        galleryScrollStartScroll = window.pageYOffset || 
+                                   window.scrollY || 
+                                   document.documentElement.scrollTop || 
+                                   document.body.scrollTop || 
+                                   0;
+        console.log('Starting scroll position:', galleryScrollStartScroll);
+        gallery.classList.add('scrolling');
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      
+      document.addEventListener('mousemove', function(e) {
+        if (!galleryScrolling) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const deltaY = e.clientY - galleryScrollStartY;
+        console.log('Gallery mousemove, deltaY:', deltaY);
+        
+        // Only scroll if mouse moved more than 3 pixels (to avoid accidental scrolling)
+        if (Math.abs(deltaY) > 3) {
+          galleryHasScrolled = true;
+          // Reversed: drag down = scroll up (decrease scrollTop), drag up = scroll down (increase scrollTop)
+          // Note: deltaY is positive when dragging down, negative when dragging up
+          // Multiply by 3 for 3x faster scrolling, and negate to reverse direction
+          const newScroll = Math.max(0, galleryScrollStartScroll - (deltaY * 3));
+          const maxScroll = Math.max(
+            document.documentElement.scrollHeight - window.innerHeight,
+            document.body.scrollHeight - window.innerHeight,
+            0
+          );
+          const clampedScroll = Math.min(newScroll, maxScroll);
+          
+          console.log('Scrolling to:', clampedScroll, 'from:', galleryScrollStartScroll, 'deltaY:', deltaY, 'maxScroll:', maxScroll);
+          
+          // Try multiple scroll methods for compatibility
+          window.scrollTo(0, clampedScroll);
+          if (document.documentElement.scrollTop !== undefined) {
+            document.documentElement.scrollTop = clampedScroll;
+          }
+          if (document.body.scrollTop !== undefined) {
+            document.body.scrollTop = clampedScroll;
+          }
+        }
+      });
+      
+      document.addEventListener('mouseup', function(e) {
+        if (galleryScrolling) {
+          // If we scrolled, prevent image click from firing
+          if (galleryHasScrolled) {
+            const imgContainer = e.target.closest('.img-container');
+            if (imgContainer) {
+              // Cancel the click event on the image to prevent lightbox from opening
+              e.preventDefault();
+              e.stopPropagation();
+              // Also stop the click event that might fire after mouseup
+              imgContainer.addEventListener('click', function cancelClick(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                evt.stopImmediatePropagation();
+                imgContainer.removeEventListener('click', cancelClick, true);
+              }, true);
+            }
+          }
+          galleryScrolling = false;
+          gallery.classList.remove('scrolling');
+        }
+      });
+      
+      gallery.addEventListener('mouseleave', function(e) {
+        if (galleryScrolling) {
+          galleryScrolling = false;
+          gallery.classList.remove('scrolling');
+        }
+      });
+    }
+    
+    // Initialize gallery scrolling when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupGalleryScrolling);
+    } else {
+      setupGalleryScrolling();
+    }
+  </script>
+</body>
+</html>
