@@ -181,6 +181,49 @@
     .image-button:hover::after {
       opacity: 1;
     }
+    .star-button {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 22px;
+      height: 22px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid #4f4f4f;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease, background 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      z-index: 3;
+      padding: 0;
+    }
+    /* Always show star if favorited, only show on hover if not favorited */
+    .star-button.favorited {
+      opacity: 0.9;
+    }
+    .img-container:hover .star-button {
+      opacity: 0.9;
+    }
+    .star-button:hover {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.85);
+    }
+    .star-button.favorited {
+      background: rgba(255, 193, 7, 0.3);
+      border-color: rgba(255, 193, 7, 0.6);
+    }
+    .star-button.favorited svg {
+      fill: #ffc107;
+    }
+    .star-button svg {
+      width: 14px;
+      height: 14px;
+      fill: #fff;
+      transition: fill 0.2s;
+    }
     /* Legacy class names for backwards compatibility */
     .open-button {
       position: absolute;
@@ -307,6 +350,44 @@
       box-shadow: 0 0 2px #111;
       opacity: 0.65;
       z-index: 20;
+    }
+    .lightbox-star-button {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      width: 32px;
+      height: 32px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.7;
+      transition: opacity 0.2s ease, background 0.2s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      z-index: 100001;
+      padding: 0;
+      pointer-events: auto; /* Override parent's pointer-events: none */
+    }
+    .lightbox-star-button:hover {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.6);
+    }
+    .lightbox-star-button.favorited {
+      background: rgba(255, 193, 7, 0.3);
+      border-color: rgba(255, 193, 7, 0.6);
+    }
+    .lightbox-star-button.favorited svg {
+      fill: #ffc107;
+    }
+    .lightbox-star-button svg {
+      width: 18px;
+      height: 18px;
+      fill: #fff;
+      transition: fill 0.2s;
+      pointer-events: none; /* Prevent SVG from intercepting clicks */
     }
     /* ---- Lightbox Navigation Arrows ---- */
     .lightbox-nav-arrow {
@@ -472,7 +553,6 @@
       justify-content: center;
       gap: 20px;
       padding: 0 20px;
-      padding-right: 0;
       z-index: 1000;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       transform: translateY(-100%);
@@ -581,10 +661,55 @@
       border-color: rgba(255, 255, 255, 0.5);
       color: rgba(255, 255, 255, 1);
     }
+    .sort-btn.favorites-active {
+      background: rgba(255, 193, 7, 0.3);
+      border-color: rgba(255, 193, 7, 0.6);
+    }
+    .sort-btn.favorites-active svg {
+      fill: #ffc107;
+    }
     .sort-btn svg {
       width: 14px;
       height: 14px;
       fill: currentColor;
+    }
+    /* ---- Reload Button ---- */
+    .reload-btn {
+      position: absolute;
+      right: 20px;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      background: rgba(60, 60, 60, 0.8);
+      border: 1px solid rgba(80, 80, 80, 0.6);
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .reload-btn:hover {
+      background: rgba(80, 80, 80, 0.9);
+      border-color: rgba(100, 100, 100, 0.8);
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .reload-btn:active {
+      transform: scale(0.95);
+    }
+    .reload-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+    .reload-btn.loading svg {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
     /* ---- Size Control ---- */
     .size-control {
@@ -842,10 +967,10 @@
 <body>
   <div class="top-nav">
     <div class="size-control">
-      <div class="size-circle active" data-size="0.6" title="40% smaller"></div>
-      <div class="size-circle" data-size="0.8" title="20% smaller"></div>
-      <div class="size-circle" data-size="1.0" title="Default size"></div>
-      <div class="size-circle" data-size="1.2" title="20% larger"></div>
+      <div class="size-circle active" data-size="0.6" title="Small"></div>
+      <div class="size-circle" data-size="0.8" title="Medium"></div>
+      <div class="size-circle" data-size="1.0" title="Large"></div>
+      <div class="size-circle" data-size="1.2" title="Huge"></div>
     </div>
     <div class="search-wrapper">
       <input type="text" class="search-input" id="searchInput" />
@@ -862,7 +987,17 @@
           <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
         </svg>
       </button>
+      <button class="sort-btn" id="favoritesFilter" title="Show favorites only">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+        </svg>
+      </button>
     </div>
+    <button class="reload-btn" id="reloadBtn" title="Rescan folders and reload images">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+      </svg>
+    </button>
   </div>
   <div class="gallery" id="gallery"></div>
   <div class="bottom-nav hidden" id="bottomNav">
@@ -915,6 +1050,11 @@
     <div class="lightbox-image-container" id="lightboxContainer">
       <img class="lightbox-img" id="lightboxImg" src="" alt="" />
       <span class="lightbox-filename" id="lightboxFilename"></span>
+      <button class="lightbox-star-button" id="lightboxStarButton" title="Add to favorites">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+        </svg>
+      </button>
     </div>
     <button class="lightbox-nav-arrow left" id="lightboxPrev" aria-label="Previous image">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -985,6 +1125,9 @@
       return path.split(/[/\\]/).pop();
     }
     async function showLightbox(src, filename, index = -1) {
+      // Store scroll position before opening lightbox
+      scrollPositionBeforeLightbox = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+      
       const lightbox = document.getElementById('lightbox');
       const img = document.getElementById('lightboxImg');
       const label = document.getElementById('lightboxFilename');
@@ -1053,6 +1196,23 @@
       img.onload = function() {
         resetImageSize();
       };
+      
+      // Update lightbox star button
+      const lightboxStarButton = document.getElementById('lightboxStarButton');
+      if (lightboxStarButton) {
+        const isFavorited = filename.startsWith('Favorites/') || 
+                           filename.startsWith('Favorites\\') ||
+                           filename.includes('/Favorites/') || 
+                           filename.includes('\\Favorites\\');
+        if (isFavorited) {
+          lightboxStarButton.classList.add('favorited');
+          lightboxStarButton.setAttribute('title', 'Remove from favorites');
+        } else {
+          lightboxStarButton.classList.remove('favorited');
+          lightboxStarButton.setAttribute('title', 'Add to favorites');
+        }
+        lightboxStarButton.dataset.filename = filename;
+      }
     }
     
     function resetImageSize() {
@@ -1089,6 +1249,30 @@
       document.getElementById('lightbox').classList.remove('active');
       document.getElementById('lightbox').classList.remove('hide-cursor');
       currentLightboxIndex = -1;
+      
+      // Restore scroll position after closing lightbox
+      if (scrollPositionBeforeLightbox > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPositionBeforeLightbox);
+          if (document.documentElement.scrollTop !== undefined) {
+            document.documentElement.scrollTop = scrollPositionBeforeLightbox;
+          }
+          if (document.body.scrollTop !== undefined) {
+            document.body.scrollTop = scrollPositionBeforeLightbox;
+          }
+          // Also restore after a brief delay to ensure it sticks
+          setTimeout(() => {
+            window.scrollTo(0, scrollPositionBeforeLightbox);
+            if (document.documentElement.scrollTop !== undefined) {
+              document.documentElement.scrollTop = scrollPositionBeforeLightbox;
+            }
+            if (document.body.scrollTop !== undefined) {
+              document.body.scrollTop = scrollPositionBeforeLightbox;
+            }
+          }, 10);
+        });
+      }
+      
       // Hide navigation arrows
       const prevBtn = document.getElementById('lightboxPrev');
       const nextBtn = document.getElementById('lightboxNext');
@@ -1155,6 +1339,25 @@
       const filename = filteredImageFiles[newIndex];
       showLightbox(escapeFilename(filename), filename, newIndex);
       
+      // Update lightbox star button after navigation
+      setTimeout(() => {
+        const lightboxStarButton = document.getElementById('lightboxStarButton');
+        if (lightboxStarButton && filename) {
+          const isFavorited = filename.startsWith('Favorites/') || 
+                             filename.startsWith('Favorites\\') ||
+                             filename.includes('/Favorites/') || 
+                             filename.includes('\\Favorites\\');
+          if (isFavorited) {
+            lightboxStarButton.classList.add('favorited');
+            lightboxStarButton.setAttribute('title', 'Remove from favorites');
+          } else {
+            lightboxStarButton.classList.remove('favorited');
+            lightboxStarButton.setAttribute('title', 'Add to favorites');
+          }
+          lightboxStarButton.dataset.filename = filename;
+        }
+      }, 100);
+      
       // Reset flag after a short delay to allow navigation to complete
       setTimeout(() => {
         isNavigating = false;
@@ -1167,10 +1370,66 @@
     const baseColumnWidth = 600;
     let currentLightboxIndex = -1; // Track current image index in lightbox
     let isNavigating = false; // Flag to prevent closing during navigation
+    let scrollPositionBeforeLightbox = 0; // Store scroll position before opening lightbox
     let sortState = {
       filename: null, // null, 'asc', 'desc'
       date: null
     };
+    let showFavoritesOnly = false; // Track favorites filter state
+    let favoriteOriginalPaths = new Map(); // Track original paths of favorited images: filename -> originalPath (in-memory cache)
+    const HISTORY_STORAGE_KEY = 'favoritesHistory'; // localStorage key for history
+    
+    // Load favorites history from localStorage
+    function loadFavoritesHistory() {
+      try {
+        const historyJson = localStorage.getItem(HISTORY_STORAGE_KEY);
+        if (historyJson) {
+          const history = JSON.parse(historyJson);
+          // Populate the in-memory map from localStorage
+          Object.entries(history).forEach(([favoritesPath, originalPath]) => {
+            favoriteOriginalPaths.set(favoritesPath, originalPath);
+          });
+          console.log('Loaded favorites history:', Object.keys(history).length, 'entries');
+          return true;
+        }
+      } catch (error) {
+        console.error('Error loading favorites history:', error);
+      }
+      return false;
+    }
+    
+    // Save favorites history to localStorage
+    function saveFavoritesHistory() {
+      try {
+        // Convert Map to plain object for JSON storage
+        const history = {};
+        favoriteOriginalPaths.forEach((originalPath, favoritesPath) => {
+          history[favoritesPath] = originalPath;
+        });
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+        return true;
+      } catch (error) {
+        console.error('Error saving favorites history:', error);
+        return false;
+      }
+    }
+    
+    // Add an entry to history
+    function addToHistory(favoritesPath, originalPath) {
+      favoriteOriginalPaths.set(favoritesPath, originalPath);
+      saveFavoritesHistory();
+    }
+    
+    // Remove an entry from history
+    function removeFromHistory(favoritesPath) {
+      favoriteOriginalPaths.delete(favoritesPath);
+      saveFavoritesHistory();
+    }
+    
+    // Get original path from history, or return null if not found
+    function getOriginalPathFromHistory(favoritesPath) {
+      return favoriteOriginalPaths.get(favoritesPath) || null;
+    }
     let imageDates = new Map(); // Cache file dates
     let imageMetadataCache = new Map(); // Cache PNG metadata to avoid re-fetching
     let imageSearchIndex = new Map(); // Index for search: filename -> {model, prompt}
@@ -1272,6 +1531,183 @@
     let imagesPerPage = 100;
     let filteredImageFiles = []; // Images after filtering
     let filteredImageContainers = []; // Containers after filtering
+    
+    // Favorite functionality
+    function getFavoritesFolderPath(filename) {
+      // Always put Favorites in the root of the gallery folder
+      const pathParts = filename.split(/[/\\]/);
+      const fileName = pathParts.pop();
+      // Return just "Favorites/filename" (root level)
+      return 'Favorites/' + fileName;
+    }
+    
+    function getOriginalPathFromFavorites(favoritesPath) {
+      // First check if we have it in history (localStorage)
+      const historyPath = getOriginalPathFromHistory(favoritesPath);
+      if (historyPath) {
+        return historyPath;
+      }
+      
+      // If no history exists, use 'Images' folder as fallback
+      const pathParts = favoritesPath.split(/[/\\]/);
+      const fileName = pathParts.pop();
+      // Remove 'Favorites' from path
+      const favoritesIndex = pathParts.indexOf('Favorites');
+      if (favoritesIndex !== -1) {
+        pathParts.splice(favoritesIndex, 1);
+      }
+      
+      // Check if history exists in localStorage
+      const hasHistory = localStorage.getItem(HISTORY_STORAGE_KEY) !== null;
+      
+      if (hasHistory) {
+        // History exists but this entry is missing - try to reconstruct
+        if (pathParts.length > 0) {
+          return pathParts.join('/') + '/' + fileName;
+        } else {
+          return fileName;
+        }
+      } else {
+        // No history exists - use 'Images' folder as default
+        return 'Images/' + fileName;
+      }
+    }
+    
+    async function toggleFavorite(filename, starButton) {
+      try {
+        // Normalize the filename path (handle both / and \)
+        filename = filename.replace(/\\/g, '/');
+        
+        const isCurrentlyFavorited = filename.startsWith('Favorites/') || 
+                                     filename.includes('/Favorites/');
+        let newPath, oldPath;
+        
+        if (isCurrentlyFavorited) {
+          // Remove from favorites - move back to original location
+          // The file is currently at: filename (e.g., "Favorites/image.jpg")
+          oldPath = filename;
+          
+          // Get original path from history (localStorage) or construct it
+          const historyPath = getOriginalPathFromHistory(filename);
+          if (historyPath) {
+            newPath = historyPath.replace(/\\/g, '/');
+            console.log('Unfavoriting: Using history path', oldPath, '->', newPath);
+          } else {
+            newPath = getOriginalPathFromFavorites(filename).replace(/\\/g, '/');
+            console.log('Unfavoriting: Using fallback path', oldPath, '->', newPath);
+          }
+          // Remove from history
+          removeFromHistory(filename);
+        } else {
+          // Add to favorites
+          // The file is currently at: filename (e.g., "2025-11-17/image.jpg")
+          oldPath = filename;
+          newPath = getFavoritesFolderPath(filename).replace(/\\/g, '/');
+          console.log('Favoriting: Moving', oldPath, '->', newPath);
+          // Store original path in history (localStorage)
+          addToHistory(newPath, oldPath);
+        }
+        
+        console.log('Moving file:', { oldPath, newPath });
+        
+        // Use fetch to move the file (this is a server-side operation)
+        // Note: This requires server support for file operations
+        const response = await fetch('/move-file', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            oldPath: oldPath,
+            newPath: newPath
+          })
+        });
+        
+        if (response.ok) {
+          // Update the star button state immediately
+          if (isCurrentlyFavorited) {
+            starButton.classList.remove('favorited');
+            starButton.setAttribute('data-label', 'Add to favorites');
+          } else {
+            starButton.classList.add('favorited');
+            starButton.setAttribute('data-label', 'Remove from favorites');
+          }
+          
+          // Also update lightbox star button if it exists and shows the same file
+          const lightboxStarButton = document.getElementById('lightboxStarButton');
+          if (lightboxStarButton && lightboxStarButton.dataset.filename === oldPath) {
+            if (isCurrentlyFavorited) {
+              lightboxStarButton.classList.remove('favorited');
+              lightboxStarButton.setAttribute('title', 'Add to favorites');
+            } else {
+              lightboxStarButton.classList.add('favorited');
+              lightboxStarButton.setAttribute('title', 'Remove from favorites');
+            }
+            lightboxStarButton.dataset.filename = newPath;
+          }
+          
+          // Update filename in arrays
+          const oldIndex = allImageFiles.indexOf(oldPath);
+          if (oldIndex !== -1) {
+            allImageFiles[oldIndex] = newPath;
+          }
+          
+          const filteredIndex = filteredImageFiles.indexOf(oldPath);
+          if (filteredIndex !== -1) {
+            filteredImageFiles[filteredIndex] = newPath;
+          }
+          
+          // Update container dataset - DO NOT update image src to avoid reload/flash/scroll
+          // The file is moved on the server, but the image content is identical
+          // The browser already has the image loaded, so we don't need to change the src
+          starButton.dataset.filename = newPath;
+          const container = starButton.closest('.img-container');
+          if (container) {
+            container.dataset.filename = newPath;
+            // DO NOT update img.src - this causes reload, white flash, and scroll issues
+            // The image is already loaded and displayed correctly
+            // Only update data attributes for future reference
+          }
+          
+          // Update lightbox image if it's showing this file
+          const lightboxImg = document.getElementById('lightboxImg');
+          if (lightboxImg && lightboxImg.src && lightboxImg.src.includes(escapeFilename(oldPath))) {
+            const newImageUrl = escapeFilename(newPath);
+            lightboxImg.src = newImageUrl;
+            // Update the lightbox filename display
+            const lightboxFilename = document.getElementById('lightboxFilename');
+            if (lightboxFilename) {
+              const baseFilename = removeExtension(getFilenameOnly(newPath));
+              lightboxFilename.textContent = baseFilename;
+            }
+          }
+          
+          // Don't reload - we've updated everything dynamically
+        } else {
+          // Get the error message from the server
+          let errorMessage = 'Failed to update favorite.';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          }
+          console.error('Failed to move file:', errorMessage);
+          alert('Failed to update favorite: ' + errorMessage);
+        }
+      } catch (error) {
+        console.error('Error toggling favorite:', error);
+        alert('Error updating favorite: ' + error.message);
+      }
+    }
+    
+    function isFavorited(filename) {
+      return filename.startsWith('Favorites/') || 
+             filename.startsWith('Favorites\\') ||
+             filename.includes('/Favorites/') || 
+             filename.includes('\\Favorites\\');
+    }
 
     function layoutMasonry() {
       const gallery = document.getElementById('gallery');
@@ -1404,40 +1840,55 @@
     function updatePaginationUI() {
       const bottomNav = document.getElementById('bottomNav');
       const paginationNumbers = document.getElementById('paginationNumbers');
+      const paginationPrev = document.getElementById('paginationPrev');
+      const paginationNext = document.getElementById('paginationNext');
       const pageSizeStandalone = document.getElementById('bottomNavPageSizeStandalone');
       if (!bottomNav || !paginationNumbers) return;
       
       const totalPages = getTotalPages();
       
-      // Show bottom nav if more than one page
-      if (totalPages > 1) {
-        bottomNav.classList.remove('hidden');
-        // Don't add 'visible' class here - let mouse proximity handler manage it
-        if (pageSizeStandalone) {
-          pageSizeStandalone.classList.add('hidden');
-        }
-      } else {
-        bottomNav.classList.add('hidden');
-        // Show standalone page size selector when bottom nav is hidden
-        if (pageSizeStandalone) {
-          pageSizeStandalone.classList.remove('hidden');
-          // Don't add 'visible' class here - let mouse proximity handler manage it
-        }
+      // Always show bottom nav (even with single page)
+      bottomNav.classList.remove('hidden');
+      // Don't add 'visible' class here - let mouse proximity handler manage it
+      if (pageSizeStandalone) {
+        pageSizeStandalone.classList.add('hidden');
       }
       
-      // Clear existing page numbers
-      paginationNumbers.innerHTML = '';
-      
-      // Create page number buttons
-      for (let i = 1; i <= totalPages; i++) {
-        const pageBtn = document.createElement('button');
-        pageBtn.className = 'pagination-number';
-        if (i === currentPage) {
-          pageBtn.classList.add('active');
+      // Show/hide pagination arrows and page numbers based on page count
+      if (totalPages > 1) {
+        // Show arrows and page numbers when there are multiple pages
+        if (paginationPrev) {
+          paginationPrev.style.display = 'flex';
         }
-        pageBtn.textContent = i;
-        pageBtn.addEventListener('click', () => goToPage(i));
-        paginationNumbers.appendChild(pageBtn);
+        if (paginationNext) {
+          paginationNext.style.display = 'flex';
+        }
+        paginationNumbers.style.display = 'flex';
+        
+        // Clear existing page numbers
+        paginationNumbers.innerHTML = '';
+        
+        // Create page number buttons
+        for (let i = 1; i <= totalPages; i++) {
+          const pageBtn = document.createElement('button');
+          pageBtn.className = 'pagination-number';
+          if (i === currentPage) {
+            pageBtn.classList.add('active');
+          }
+          pageBtn.textContent = i;
+          pageBtn.addEventListener('click', () => goToPage(i));
+          paginationNumbers.appendChild(pageBtn);
+        }
+      } else {
+        // Hide arrows and page numbers when there's only one page
+        if (paginationPrev) {
+          paginationPrev.style.display = 'none';
+        }
+        if (paginationNext) {
+          paginationNext.style.display = 'none';
+        }
+        paginationNumbers.style.display = 'none';
+        paginationNumbers.innerHTML = '';
       }
     }
     
@@ -1773,9 +2224,37 @@
           }
         }, 60000); // 60 seconds for very large images
 
+        // Create star button (upper right corner)
+        const starButton = document.createElement('button');
+        starButton.className = 'star-button';
+        starButton.setAttribute('data-label', 'Add to favorites');
+        starButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
+        starButton.dataset.filename = filename;
+        
+        // Check if image is in Favorites folder (check for Favorites at start or anywhere in path)
+        const isFavorited = filename.startsWith('Favorites/') || 
+                           filename.startsWith('Favorites\\') ||
+                           filename.includes('/Favorites/') || 
+                           filename.includes('\\Favorites\\');
+        if (isFavorited) {
+          starButton.classList.add('favorited');
+          starButton.setAttribute('data-label', 'Remove from favorites');
+        }
+        
+        starButton.addEventListener('click', function(e) {
+          e.preventDefault(); // Prevent any default button behavior
+          e.stopPropagation(); // Prevent event bubbling to parent elements
+          e.stopImmediatePropagation(); // Prevent other handlers on the same element
+          // Use the dataset filename which should reflect the current path
+          // This is important if the file was moved in a previous session
+          const currentFilename = this.dataset.filename || filename;
+          toggleFavorite(currentFilename, starButton);
+        });
+
         wrapper.appendChild(img);
         wrapper.appendChild(label);
         wrapper.appendChild(buttonContainer);
+        wrapper.appendChild(starButton);
         container.appendChild(wrapper);
 
         container.addEventListener('click', function(e) {
@@ -1804,15 +2283,24 @@
       // Reset to page 1 when filtering
       currentPage = 1;
       
+      let filtered = [];
+      
+      // First apply favorites filter if enabled
+      if (showFavoritesOnly) {
+        filtered = allImageFiles.filter(filename => isFavorited(filename));
+      } else {
+        filtered = [...allImageFiles];
+      }
+      
       if (currentQuery.length < 2) {
-        // Show all images if search is less than 2 characters
-        filteredImageFiles = [...allImageFiles];
+        // Show all images (or favorites if filter is on) if search is less than 2 characters
+        filteredImageFiles = filtered;
       } else {
         const query = currentQuery.toLowerCase();
         const filteredSet = new Set(); // Use Set for O(1) lookups instead of array includes
         
-        // Filter based on filenames (optimized with Set)
-        allImageFiles.forEach((filename) => {
+        // Filter based on filenames (optimized with Set) - use filtered array
+        filtered.forEach((filename) => {
           const filenameOnly = getFilenameOnly(filename).toLowerCase();
           if (filenameOnly.includes(query)) {
             filteredSet.add(filename);
@@ -1821,7 +2309,8 @@
         
         // Search through global metadata index (works for all images, not just current page)
         imageSearchIndex.forEach((metadata, filename) => {
-          if (metadata.model.includes(query) || metadata.prompt.includes(query)) {
+          // Only include if it's in our filtered list
+          if (filtered.includes(filename) && (metadata.model.includes(query) || metadata.prompt.includes(query))) {
             filteredSet.add(filename);
           }
         });
@@ -1835,14 +2324,14 @@
           if (modelName.includes(query) || prompt.includes(query)) {
             // Use stored filename from dataset for faster lookup
             const filename = container.dataset.filename;
-            if (filename) {
+            if (filename && filtered.includes(filename)) {
               filteredSet.add(filename);
             } else {
               // Fallback: Extract filename from img src
               const img = container.querySelector('img');
               if (img && img.src) {
                 const srcPath = decodeURIComponent(img.src);
-                const foundFilename = allImageFiles.find(f => srcPath.includes(f));
+                const foundFilename = filtered.find(f => srcPath.includes(f));
                 if (foundFilename) {
                   filteredSet.add(foundFilename);
                 }
@@ -1945,243 +2434,269 @@
     // Embedded image list - injected by inject_image_list.py
     // IMAGE_LIST_PLACEHOLDER
     const embeddedImageList = [
-  "images/00030-62184363.png",
-  "images/Aor-001.jpg",
-  "images/Aor-002.jpg",
-  "images/Aor-003.jpg",
-  "images/Aor-004.jpg",
-  "images/Aor-005.jpg",
-  "images/Aor-006.jpg",
-  "images/Aor-007.jpg",
-  "images/Aor-008.jpg",
-  "images/Aor-009.jpg",
-  "images/Aor-010.jpg",
-  "images/Aor-011.jpg",
-  "images/Aor-012.jpg",
-  "images/Aor-013.jpg",
-  "images/Aor-014.jpg",
-  "images/Aor-015.jpg",
-  "images/Aor-016.jpg",
-  "images/Aor-017.jpg",
-  "images/Aor-018.jpg",
-  "images/Aor-019.jpg",
-  "images/Aor-020.jpg",
-  "images/Aor-021.jpg",
-  "images/Aor-022.jpg",
-  "images/Aor-023.jpg",
-  "images/Aor-024.jpg",
-  "images/Aor-025.jpg",
-  "images/Aor-026.jpg",
-  "images/Aor-027.jpg",
-  "images/Aor-028.jpg",
-  "images/Aor-029.jpg",
-  "images/Aor-030.jpg",
-  "images/Aor-031.jpg",
-  "images/Aor-032.jpg",
-  "images/Aor-033.jpg",
-  "images/Aor-034.jpg",
-  "images/Aor-035.jpg",
-  "images/Aor-036.jpg",
-  "images/Aor-037.jpg",
-  "images/Aor-038.jpg",
-  "images/Aor-039.jpg",
-  "images/Aor-040.jpg",
-  "images/Aor-041.jpg",
-  "images/Aor-042.jpg",
-  "images/Aor-043.jpg",
-  "images/Aor-044.jpg",
-  "images/Aor-045.jpg",
-  "images/Aor-046.jpg",
-  "images/Aor-047.jpg",
-  "images/Aor-048.jpg",
-  "images/Aor-049.jpg",
-  "images/Aor-050.jpg",
-  "images/Aor-051.jpg",
-  "images/Aor-052.jpg",
-  "images/Aor-053.jpg",
-  "images/Aor-054.jpg",
-  "images/Aor-055.jpg",
-  "images/Aor-056.jpg",
-  "images/Aor-057.jpg",
-  "images/Aor-058.jpg",
-  "images/Aor-059.jpg",
-  "images/Aor-060.jpg",
-  "images/Aor-061.jpg",
-  "images/Aor-062.jpg",
-  "images/Aor-063.jpg",
-  "images/Aor-064.jpg",
-  "images/Aor-065.jpg",
-  "images/Aor-066.jpg",
-  "images/Aor-067.jpg",
-  "images/Aor-068.jpg",
-  "images/Aor-069.jpg",
-  "images/Aor-070.jpg",
-  "images/Aor-071.jpg",
-  "images/Aor-072.jpg",
-  "images/Aor-073.jpg",
-  "images/Aor-074.jpg",
-  "images/Aor-075.jpg",
-  "images/Aor-076.jpg",
-  "images/Aor-077.jpg",
-  "images/Aor-078.jpg",
-  "images/Aor-079.jpg",
-  "images/Aor-080.jpg",
-  "images/Aor-081.jpg",
-  "images/Aor-082.jpg",
-  "images/Aor-083.jpg",
-  "images/Aor-084.jpg",
-  "images/Aor-085.jpg",
-  "images/Aor-086.jpg",
-  "images/Aor-087.jpg",
-  "images/Aor-088.jpg",
-  "images/Aor-089.jpg",
-  "images/Aor-090.jpg",
-  "images/Aor-091.jpg",
-  "images/Aor-092.jpg",
-  "images/Aor-093.jpg",
-  "images/Aor-094.jpg",
-  "images/Aor-095.jpg",
-  "images/Aor-096.jpg",
-  "images/Aor-097.jpg",
-  "images/Aor-098.jpg",
-  "images/Aor-099.jpg",
-  "images/Aor-100.jpg",
-  "images/Aor-101.jpg",
-  "images/Aor-102.jpg",
-  "images/Aor-103.jpg",
-  "images/Aor-104.jpg",
-  "images/Aor-105.jpg",
-  "images/Aor-106.jpg",
-  "images/Aor-107.jpg",
-  "images/Aor-108.jpg",
-  "images/Aor-109.jpg",
-  "images/Aor-110.jpg",
-  "images/Aor-111.jpg",
-  "images/Aor-112.jpg",
-  "images/Aor-113.jpg",
-  "images/Aor-114.jpg",
-  "images/Aor-115.jpg",
-  "images/Aor-116.jpg",
-  "images/Aor-117.jpg",
-  "images/Aor-118.jpg",
-  "images/Aor-119.jpg",
-  "images/Aor-120.jpg",
-  "images/Aor-121.jpg",
-  "images/Aor-122.jpg",
-  "images/Aor-123.jpg",
-  "images/Aor-124.jpg",
-  "images/Aor-125.jpg",
-  "images/Aor-126.jpg",
-  "images/Aor-127.jpg",
-  "images/Aor-128.jpg",
-  "images/Aor-129.jpg",
-  "images/Aor-130.jpg",
-  "images/Aor-131.jpg",
-  "images/Aor-132.jpg",
-  "images/Aor-133.jpg",
-  "images/Aor-134.jpg",
-  "images/Aor-135.jpg",
-  "images/Aor-136.jpg",
-  "images/Aor-137.jpg",
-  "images/Aor-138.jpg",
-  "images/Aor-139.jpg",
-  "images/Aor-140.jpg",
-  "images/Aor-141.jpg",
-  "images/Aor-142.jpg",
-  "images/Aor-143.jpg",
-  "images/Aor-144.jpg",
-  "images/Aor-145.jpg",
-  "images/Aor-146.jpg",
-  "images/Aor-147.jpg",
-  "images/Aor-148.jpg",
-  "images/Aor-149.jpg",
-  "images/Aor-150.jpg",
-  "images/Aor-151.jpg",
-  "images/Aor-152.jpg",
-  "images/Aor-153.jpg",
-  "images/Aor-154.jpg",
-  "images/Aor-155.jpg",
-  "images/Aor-156.jpg",
-  "images/Aor-157.jpg",
-  "images/Aor-158.jpg",
-  "images/Aor-159.jpg",
-  "images/Aor-160.jpg",
-  "images/Aor-161.jpg",
-  "images/Aor-162.jpg",
-  "images/Aor-163.jpg",
-  "images/Aor-164.jpg",
-  "images/Aor-165.jpg",
-  "images/Aor-166.jpg",
-  "images/Aor-167.jpg",
-  "images/Aor-168.jpg",
-  "images/Aor-169.jpg",
-  "images/Aor-170.jpg",
-  "images/Aor-171.jpg",
-  "images/Aor-172.jpg",
-  "images/Aor-173.jpg",
-  "images/Aor-174.jpg",
-  "images/Aor-175.jpg",
-  "images/Aor-176.jpg",
-  "images/Aor-177.jpg",
-  "images/Aor-178.jpg",
-  "images/Aor-179.jpg",
-  "images/Aor-180.jpg",
-  "images/Aor-181.jpg",
-  "images/Aor-182.jpg",
-  "images/Aor-183.jpg",
-  "images/Aor-184.jpg",
-  "images/Aor-185.jpg",
-  "images/Aor-186.jpg",
-  "images/Aor-187.jpg",
-  "images/Aor-188.jpg",
-  "images/Aor-189.jpg",
-  "images/Aor-190.jpg",
-  "images/Aor-191.jpg",
-  "images/Aor-192.jpg",
-  "images/Aor-193.jpg",
-  "images/Aor-194.jpg",
-  "images/Aor-195.jpg",
-  "images/Aor-196.jpg",
-  "images/Aor-197.jpg",
-  "images/Aor-198.jpg",
-  "images/Aor-199.jpg",
-  "images/Aor-200.jpg",
-  "images/tmpoksptphy.png",
-  "images/tmprgh8xccj.png",
-  "images/tmpzqgs13d5.png",
-  "images/Upscale_00023_.png",
-  "images/Upscale_00038_.png",
-  "images/Upscale_00039_.png",
-  "images/Upscale_00040_.png",
-  "images/Upscale_00041_.png"
+  "2025-11-24/00032-2754017781-swapped.png",
+  "2025-11-24/00033-2754017781-swapped.png",
+  "2025-11-24/00034-2754017781-swapped.png",
+  "2025-11-24/00036-2754017781-swapped.png",
+  "2025-11-24/00037-2754017781-swapped.png",
+  "2025-11-24/00038-2754017781-swapped.png",
+  "2025-11-24/00039-2754017781-swapped.png",
+  "2025-11-24/00041-2754017781-swapped.png",
+  "2025-11-24/00042-2754017781-swapped.png",
+  "2025-11-24/00045-2754017781-swapped.png",
+  "2025-11-24/00046-2754017781-swapped.png",
+  "2025-11-24/00047-2754017781-swapped.png",
+  "2025-11-24/00048-2754017781-swapped.png",
+  "2025-11-24/00050-2754017781-swapped.png",
+  "2025-11-24/00051-2754017781-swapped.png",
+  "2025-11-24/00052-2754017781-swapped.png",
+  "2025-11-24/00053-2754017781-swapped.png",
+  "2025-11-24/00054-2754017781-swapped.png",
+  "2025-11-24/00055-2754017781-swapped.png",
+  "2025-11-24/00056-2754017781-swapped.png",
+  "2025-11-24/00057-2754017781-swapped.png",
+  "2025-11-24/00058-2754017781-swapped.png",
+  "2025-11-24/00059-2754017781-swapped.png",
+  "2025-11-24/00061-2754017781-swapped.png",
+  "2025-11-24/00062-2754017781-swapped.png",
+  "2025-11-24/00064-2754017781-swapped.png",
+  "2025-11-24/00065-2754017781-swapped.png",
+  "2025-11-24/00066-2754017781-swapped.png",
+  "2025-11-24/00067-2754017781-swapped.png",
+  "2025-11-24/00068-2754017781-swapped.png",
+  "2025-11-24/00069-2754017781-swapped.png",
+  "2025-11-24/00070-2754017781-swapped.png",
+  "2025-11-24/00071-2754017781-swapped.png",
+  "2025-11-24/00072-2754017781-swapped.png",
+  "2025-11-24/00073-2754017781-swapped.png",
+  "2025-11-24/00074-2754017781-swapped.png",
+  "2025-11-24/00075-2754017781-swapped.png",
+  "2025-11-24/00076-2754017781-swapped.png",
+  "2025-11-24/00078-2754017781-swapped.png",
+  "2025-11-24/00079-2754017781-swapped.png",
+  "2025-11-24/00080-2754017781-swapped.png",
+  "2025-11-24/00081-2754017781-swapped.png",
+  "2025-11-24/00082-2754017781-swapped.png",
+  "2025-11-24/00083-2754017781-swapped.png",
+  "2025-11-24/00084-2754017781-swapped.png",
+  "2025-11-24/00085-2754017781-swapped.png",
+  "2025-11-24/00086-2754017781-swapped.png",
+  "2025-11-24/00087-2754017781-swapped.png",
+  "2025-11-24/00088-2754017781-swapped.png",
+  "2025-11-24/00089-2754017781-swapped.png",
+  "2025-11-24/00090-2754017781-swapped.png",
+  "2025-11-24/00091-2754017781-swapped.png",
+  "2025-11-24/00092-2754017781-swapped.png",
+  "2025-11-24/00093-2754017781-swapped.png",
+  "2025-11-24/00095-2754017781-swapped.png",
+  "2025-11-24/00096-2754017781-swapped.png",
+  "2025-11-24/00097-2754017781-swapped.png",
+  "2025-11-24/00099-2754017781-swapped.png",
+  "2025-11-24/00100-2754017781-swapped.png",
+  "2025-11-24/00101-2754017781-swapped.png",
+  "2025-11-24/00102-2754017781-swapped.png",
+  "2025-11-24/00103-2754017781-swapped.png",
+  "2025-11-24/00104-2754017781-swapped.png",
+  "2025-11-24/00105-2754017781-swapped.png",
+  "2025-11-24/00106-2754017781-swapped.png",
+  "2025-11-24/00107-2754017781-swapped.png",
+  "2025-11-24/00108-2754017781-swapped.png",
+  "2025-11-24/00109-2754017781-swapped.png",
+  "2025-11-24/00110-2754017781-swapped.png",
+  "2025-11-24/00111-2754017781-swapped.png",
+  "2025-11-24/00112-2754017781-swapped.png",
+  "2025-11-24/00113-2754017781-swapped.png",
+  "2025-11-24/00114-2754017781-swapped.png",
+  "2025-11-24/00116-2754017781-swapped.png",
+  "2025-11-24/00117-2754017781-swapped.png",
+  "2025-11-24/00118-2754017781-swapped.png",
+  "2025-11-24/00119-2754017781-swapped.png",
+  "2025-11-24/00120-2754017781-swapped.png",
+  "2025-11-24/00121-2754017781-swapped.png",
+  "2025-11-24/00122-2754017781-swapped.png",
+  "2025-11-24/00123-2754017781-swapped.png",
+  "2025-11-24/00124-2754017781-swapped.png",
+  "2025-11-24/00125-2754017781-swapped.png",
+  "2025-11-24/00126-2754017781-swapped.png",
+  "2025-11-24/00127-2754017781-swapped.png",
+  "2025-11-24/00128-2754017781-swapped.png",
+  "2025-11-24/00129-2754017781-swapped.png",
+  "2025-11-24/00130-2754017781-swapped.png",
+  "2025-11-24/00131-2754017781-swapped.png",
+  "2025-11-24/00132-2754017781-swapped.png",
+  "2025-11-24/00133-2754017781-swapped.png",
+  "2025-11-24/00134-2754017781-swapped.png",
+  "2025-11-24/00135-2754017781-swapped.png",
+  "2025-11-24/00136-2754017781-swapped.png",
+  "2025-11-24/00137-2754017781-swapped.png",
+  "2025-11-24/00138-2754017781-swapped.png",
+  "2025-11-24/00139-2754017781-swapped.png",
+  "2025-11-24/00140-2754017781-swapped.png",
+  "2025-11-24/00141-2754017781-swapped.png",
+  "2025-11-24/00142-2754017781-swapped.png",
+  "2025-11-24/00143-2754017781-swapped.png",
+  "2025-11-24/00146-2754017781-swapped.png",
+  "2025-11-24/00147-2754017781-swapped.png",
+  "2025-11-24/00148-2754017781-swapped.png",
+  "2025-11-24/00149-2754017781-swapped.png",
+  "2025-11-24/00150-2754017781-swapped.png",
+  "2025-11-24/00151-2754017781-swapped.png",
+  "2025-11-24/00152-2754017781-swapped.png",
+  "2025-11-24/00153-2754017781-swapped.png",
+  "2025-11-24/00154-2754017781-swapped.png",
+  "2025-11-24/00155-2754017781-swapped.png",
+  "2025-11-24/00156-2754017781-swapped.png",
+  "2025-11-24/00157-2754017781-swapped.png",
+  "2025-11-24/00158-2754017781-swapped.png",
+  "2025-11-24/00159-2754017781-swapped.png",
+  "2025-11-24/00160-2754017781-swapped.png",
+  "2025-11-24/00161-2754017781-swapped.png",
+  "2025-11-24/00162-2754017781-swapped.png",
+  "2025-11-24/00163-2754017781-swapped.png",
+  "2025-11-24/00164-2754017781-swapped.png",
+  "2025-11-24/00165-2754017781-swapped.png",
+  "2025-11-24/00166-2754017781-swapped.png",
+  "2025-11-24/00167-2754017781-swapped.png",
+  "2025-11-24/00168-2754017781-swapped.png",
+  "2025-11-24/00169-2754017781-swapped.png",
+  "2025-11-24/00170-2754017781-swapped.png",
+  "2025-11-24/00171-2754017781-swapped.png",
+  "2025-11-24/00172-2754017781-swapped.png",
+  "2025-11-24/00174-2754017781-swapped.png",
+  "2025-11-24/00175-2754017781-swapped.png",
+  "2025-11-24/00176-2754017781-swapped.png",
+  "2025-11-24/00177-2754017781-swapped.png",
+  "2025-11-24/00179-2754017781-swapped.png",
+  "2025-11-24/00180-2754017781-swapped.png",
+  "2025-11-24/00181-2754017781-swapped.png",
+  "2025-11-24/00182-2754017781-swapped.png",
+  "2025-11-24/00183-2754017781-swapped.png",
+  "2025-11-24/00184-2754017781-swapped.png",
+  "2025-11-24/00185-2754017781-swapped.png",
+  "2025-11-24/00187-2754017781-swapped.png",
+  "2025-11-24/00188-2754017781-swapped.png",
+  "2025-11-24/00189-2754017781-swapped.png",
+  "2025-11-24/00190-2754017781-swapped.png",
+  "2025-11-24/00191-2754017781-swapped.png",
+  "2025-11-24/00192-2754017781-swapped.png",
+  "2025-11-24/00193-2754017781-swapped.png",
+  "2025-11-24/00194-2754017781-swapped.png",
+  "2025-11-24/00195-2754017781-swapped.png",
+  "2025-11-24/00196-2754017781-swapped.png",
+  "2025-11-24/00197-2754017781-swapped.png",
+  "2025-11-24/00199-2754017781-swapped.png",
+  "2025-11-24/Complete_AI-Jennifer-0049.png",
+  "Favorites/00000-16188927-swapped.png",
+  "Favorites/00011-2754017781-swapped.png",
+  "Favorites/00012-2754017781-swapped.png",
+  "Favorites/00013-2754017781-swapped.png",
+  "Favorites/00017-2754017781-swapped.png",
+  "Favorites/00021-2754017781-swapped.png",
+  "Favorites/00024-2754017781-swapped.png",
+  "Favorites/00031-2754017781-swapped.png",
+  "Favorites/00035-2754017781-swapped.png",
+  "Favorites/00040-2754017781-swapped.png",
+  "Favorites/00043-2754017781-swapped.png",
+  "Favorites/00044-2754017781-swapped.png",
+  "Favorites/00049-2754017781-swapped.png",
+  "Favorites/00060-2754017781-swapped.png",
+  "Favorites/00063-2754017781-swapped.png",
+  "Favorites/00077-2754017781-swapped.png",
+  "Favorites/00094-2754017781-swapped.png",
+  "Favorites/00098-2754017781-swapped.png",
+  "Favorites/00115-2754017781-swapped.png",
+  "Favorites/00144-2754017781-swapped.png",
+  "Favorites/00145-2754017781-swapped.png",
+  "Favorites/00173-2754017781-swapped.png",
+  "Favorites/00178-2754017781-swapped.png",
+  "Favorites/00186-2754017781-swapped.png",
+  "Favorites/00198-2754017781-swapped.png"
 ];
+    
+    // Function to initialize/reinitialize the gallery
+    function initializeGallery(imageList) {
+      // Load favorites history from localStorage on init
+      loadFavoritesHistory();
+      
+      allImageFiles = imageList;
+      const gallery = document.getElementById('gallery');
+      gallery.innerHTML = '';
+      allImageContainers = [];
+      
+      // Reset pagination
+      currentPage = 1;
+      
+      // Initialize image count
+      updateImageCount();
+      
+      // Initialize pagination - don't create all images upfront
+      const totalImages = allImageFiles.length;
+      
+      // Initialize filtered arrays (all images initially)
+      filteredImageFiles = [...allImageFiles];
+      filteredImageContainers = []; // Will be populated as pages are loaded
+      
+      // Initialize pagination UI
+      updatePaginationUI();
+      
+      // Load first page (this will create images for first page only and show loading bar)
+      // The loadCurrentPage function will handle showing/hiding the loading bar
+      loadCurrentPage();
+      
+      // Update image count
+      setTimeout(updateImageCount, 100);
+    }
+    
+    // Function to reload images by calling the rescan API endpoint
+    async function reloadImages() {
+      const reloadBtn = document.getElementById('reloadBtn');
+      if (!reloadBtn) return;
+      
+      // Show loading state
+      reloadBtn.classList.add('loading');
+      reloadBtn.disabled = true;
+      
+      try {
+        // Call the rescan endpoint to get updated image list
+        const response = await fetch('/rescan-images', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to rescan images: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (!data.images || !Array.isArray(data.images)) {
+          throw new Error('Invalid response format from server');
+        }
+        
+        // Reinitialize gallery with new image list
+        initializeGallery(data.images);
+        
+        console.log(`Reloaded ${data.count} images`);
+        
+      } catch (error) {
+        console.error('Error reloading images:', error);
+        alert(`Failed to reload images: ${error.message}\n\nPlease make sure the Python server is running.`);
+      } finally {
+        // Remove loading state
+        reloadBtn.classList.remove('loading');
+        reloadBtn.disabled = false;
+      }
+    }
     
     // Use embedded image list directly
     (function() {
-      allImageFiles = embeddedImageList;
-        const gallery = document.getElementById('gallery');
-        gallery.innerHTML = '';
-        allImageContainers = [];
-        
-        // Initialize image count
-        updateImageCount();
-        
-        // Initialize pagination - don't create all images upfront
-        const totalImages = allImageFiles.length;
-        
-        // Initialize filtered arrays (all images initially)
-        filteredImageFiles = [...allImageFiles];
-        filteredImageContainers = []; // Will be populated as pages are loaded
-        
-        // Initialize pagination UI
-        updatePaginationUI();
-        
-        // Load first page (this will create images for first page only and show loading bar)
-        // The loadCurrentPage function will handle showing/hiding the loading bar
-        loadCurrentPage();
-        
-        // Update image count
-        setTimeout(updateImageCount, 100);
+      initializeGallery(embeddedImageList);
 
         // Set up pagination arrow handlers
         const paginationPrev = document.getElementById('paginationPrev');
@@ -2191,6 +2706,12 @@
         }
         if (paginationNext) {
           paginationNext.addEventListener('click', goToNextPage);
+        }
+        
+        // Set up reload button
+        const reloadBtn = document.getElementById('reloadBtn');
+        if (reloadBtn) {
+          reloadBtn.addEventListener('click', reloadImages);
         }
         
         // Set up page size selector (both in pagination bar and standalone)
@@ -2241,23 +2762,25 @@
         const topNav = document.querySelector('.top-nav');
         const bottomNav = document.getElementById('bottomNav');
         const pageSizeStandalone = document.getElementById('bottomNavPageSizeStandalone');
-        const PROXIMITY_THRESHOLD = 150; // pixels from top/bottom edge
+        const PROXIMITY_THRESHOLD = 60; // pixels from top/bottom edge (reduced for smaller activation area)
         
-        let mouseY = 0;
+        let mouseY = -1; // Initialize to -1 so we know it hasn't been set yet
         let showBarsTimeout = null;
         
         // Make updateBarsVisibility accessible from loadCurrentPage
         window.updateBarsVisibility = function() {
           const windowHeight = window.innerHeight;
-          const nearTop = mouseY <= PROXIMITY_THRESHOLD;
-          const nearBottom = mouseY >= windowHeight - PROXIMITY_THRESHOLD;
+          // If mouseY hasn't been set yet, assume middle of screen (bars hidden)
+          const currentMouseY = mouseY < 0 ? windowHeight / 2 : mouseY;
+          const nearTop = currentMouseY <= PROXIMITY_THRESHOLD;
+          const nearBottom = currentMouseY >= windowHeight - PROXIMITY_THRESHOLD;
           const gallery = document.getElementById('gallery');
           const loadingBarContainer = document.getElementById('loadingBarContainer');
           
           // Check if loading is in progress
           const isCurrentlyLoading = loadingBarContainer && !loadingBarContainer.classList.contains('hidden');
           
-          // Show/hide top nav (always show if loading)
+          // Show/hide top nav (always show if loading, or mouse near top)
           let topBarVisible = false;
           if (topNav) {
             if (nearTop || isCurrentlyLoading) {
@@ -2268,22 +2791,34 @@
             }
           }
           
-          // Show/hide bottom nav (always show if loading)
+          // Show/hide bottom nav - show when:
+          // 1. Loading is in progress, OR
+          // 2. Mouse is within threshold of bottom edge (nearBottom)
           let bottomBarVisible = false;
           if (bottomNav && !bottomNav.classList.contains('hidden')) {
-            if (nearBottom || isCurrentlyLoading) {
+            // Show if:
+            // - Loading, OR
+            // - Mouse near bottom edge
+            const shouldShow = isCurrentlyLoading || nearBottom;
+            
+            // Always explicitly set visibility - don't rely on default state
+            if (shouldShow) {
               bottomNav.classList.add('visible');
               bottomBarVisible = true;
             } else {
+              // Explicitly hide if conditions not met
               bottomNav.classList.remove('visible');
             }
           }
           
           if (pageSizeStandalone && !pageSizeStandalone.classList.contains('hidden')) {
-            if (nearBottom || isCurrentlyLoading) {
+            // Same logic for standalone page size selector
+            const shouldShow = isCurrentlyLoading || nearBottom;
+            if (shouldShow) {
               pageSizeStandalone.classList.add('visible');
               bottomBarVisible = true;
             } else {
+              // Explicitly hide if conditions not met
               pageSizeStandalone.classList.remove('visible');
             }
           }
@@ -2298,16 +2833,23 @@
           }
         }
         
-        // Track mouse position
+        // Track mouse position - only update when mouse actually moves
+        let lastMouseY = -1;
         document.addEventListener('mousemove', function(e) {
           mouseY = e.clientY;
-          updateBarsVisibility();
+          // Only update visibility if mouse position actually changed significantly
+          // This prevents constant updates when mouse is stationary
+          if (Math.abs(mouseY - lastMouseY) > 5) {
+            lastMouseY = mouseY;
+            updateBarsVisibility();
+          }
           
           // Clear any existing timeout
           if (showBarsTimeout) {
             clearTimeout(showBarsTimeout);
           }
         });
+        
         
         // Hide bars when mouse leaves window (with delay)
         document.addEventListener('mouseleave', function() {
@@ -2330,14 +2872,35 @@
             clearTimeout(showBarsTimeout);
             showBarsTimeout = null;
           }
+          // Only update visibility, don't force show
           updateBarsVisibility();
         });
         
-        // Initial check on page load - show bars if mouse is already near edges
-        // Use a small delay to ensure DOM is ready
+        // Initial check on page load - ensure bars start hidden
+        // Bottom bar should ALWAYS start hidden, only show when mouse is near bottom
         setTimeout(() => {
+          // If mouseY hasn't been set by mousemove, set it to middle so bars don't show by default
+          if (mouseY < 0) {
+            mouseY = window.innerHeight / 2;
+          }
+          // Explicitly hide bottom bar on initial load - it should only show when mouse is near bottom
+          if (bottomNav && !bottomNav.classList.contains('hidden')) {
+            bottomNav.classList.remove('visible');
+          }
+          if (pageSizeStandalone && !pageSizeStandalone.classList.contains('hidden')) {
+            pageSizeStandalone.classList.remove('visible');
+          }
+          // Then update visibility based on actual conditions (will hide bottom bar since mouse is in middle)
           updateBarsVisibility();
         }, 100);
+        
+        // Also ensure bottom bar is hidden immediately on page load
+        if (bottomNav && !bottomNav.classList.contains('hidden')) {
+          bottomNav.classList.remove('visible');
+        }
+        if (pageSizeStandalone && !pageSizeStandalone.classList.contains('hidden')) {
+          pageSizeStandalone.classList.remove('visible');
+        }
         
         // Set up search input listener
         const searchInput = document.getElementById('searchInput');
@@ -2641,6 +3204,55 @@
     // Set up sort button handlers
     document.getElementById('sortFilename').addEventListener('click', sortByFilename);
     document.getElementById('sortDate').addEventListener('click', sortByDate);
+    
+    // Favorites filter button
+    const favoritesFilterBtn = document.getElementById('favoritesFilter');
+    if (favoritesFilterBtn) {
+      favoritesFilterBtn.addEventListener('click', function() {
+        showFavoritesOnly = !showFavoritesOnly;
+        if (showFavoritesOnly) {
+          this.classList.add('favorites-active');
+        } else {
+          this.classList.remove('favorites-active');
+        }
+        // Re-apply current search filter (which will also apply favorites filter)
+        const searchInput = document.getElementById('searchInput');
+        filterImages(searchInput ? searchInput.value : '');
+      });
+    }
+    
+    // Lightbox star button - use capture phase to handle before lightbox click
+    const lightboxStarButton = document.getElementById('lightboxStarButton');
+    if (lightboxStarButton) {
+      // Add handler in capture phase to catch it before lightbox handler
+      lightboxStarButton.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        
+        const filename = this.dataset.filename;
+        if (!filename) {
+          console.warn('Lightbox star button: no filename');
+          return;
+        }
+        
+        console.log('Lightbox star clicked for:', filename);
+        
+        // Find the corresponding gallery star button
+        const galleryStarButton = document.querySelector(`.star-button[data-filename="${filename}"]`);
+        // Use the lightbox button itself if no gallery button found
+        const buttonToUpdate = galleryStarButton || this;
+        
+        try {
+          // Use the dataset filename which should reflect the current path
+          await toggleFavorite(filename, buttonToUpdate);
+          // Note: toggleFavorite will update both buttons dynamically
+        } catch (error) {
+          console.error('Error toggling favorite from lightbox:', error);
+          alert('Error updating favorite: ' + error.message);
+        }
+      }, true); // Use capture phase
+    }
 
     // --- Click-and-Hold Zoom with Panning ---
     let zoomActive = false;
@@ -2801,15 +3413,21 @@
     
     // Click on overlay (not image) to close
     lightbox.addEventListener('click', function(e) {
-      // Don't close if navigating or clicking on navigation arrows
-      if (isNavigating || e.target.closest('.lightbox-nav-arrow')) {
+      // Don't close if navigating, clicking on navigation arrows, or star button
+      // Check both the target and if the click originated from within these elements
+      const clickedStarButton = e.target.closest('.lightbox-star-button') || 
+                                 e.target.classList.contains('lightbox-star-button') ||
+                                 e.target.closest('#lightboxStarButton');
+      const clickedNavArrow = e.target.closest('.lightbox-nav-arrow');
+      
+      if (isNavigating || clickedNavArrow || clickedStarButton) {
         e.stopPropagation();
         return;
       }
       
-      // Only close if clicking on the overlay itself or the image container
-      // But not on the image itself (image clicks are handled separately)
-      if (e.target === lightbox || e.target.classList.contains('lightbox-image-container')) {
+      // Only close if clicking directly on the overlay itself
+      // Don't close if clicking on the image container (it contains the star button)
+      if (e.target === lightbox) {
         hideLightbox();
       }
     });
@@ -3019,14 +3637,67 @@
       let text = parametersText.replace(/^parameters\s*/i, '').trim();
       
       // Find the position of "Negative prompt:" to separate positive prompt
-      const negativePromptMatch = text.match(/Negative prompt\s*:/i);
+      // IMPORTANT: Only match "Negative prompt:" (not "ADetailer negative prompt" or other variants)
+      // Match "Negative prompt:" but NOT "ADetailer negative prompt" or "ADetailer X negative prompt"
+      let negativePromptMatch = text.match(/\n\s*Negative prompt\s*:?\s*/i);
+      if (!negativePromptMatch) {
+        negativePromptMatch = text.match(/(?:^|,\s*)Negative prompt\s*:?\s*/i);
+      }
+      // Verify it's not part of "ADetailer negative prompt" - check text before the match
+      if (negativePromptMatch) {
+        const matchIndex = negativePromptMatch.index;
+        // Check a reasonable amount of text before the match (up to 30 chars should be enough)
+        const checkStart = Math.max(0, matchIndex - 30);
+        const beforeMatch = text.substring(checkStart, matchIndex).toLowerCase();
+        // Check if "adetailer" appears before "negative prompt" (within reasonable distance)
+        if (beforeMatch.includes('adetailer')) {
+          negativePromptMatch = null;
+        }
+      }
       const negativePromptIndex = negativePromptMatch ? negativePromptMatch.index : -1;
       
       if (negativePromptIndex > 0) {
         // Extract positive prompt (everything before "Negative prompt:")
         let positivePrompt = text.substring(0, negativePromptIndex).trim();
+        
+        // If prompt contains Loras, ensure it ends at the last Lora '>'
+        const loraMatches = positivePrompt.match(/<lora:[^>]+>/gi);
+        if (loraMatches && loraMatches.length > 0) {
+          // Find the position of the last Lora tag
+          const lastLoraIndex = positivePrompt.lastIndexOf('>');
+          if (lastLoraIndex >= 0) {
+            // Extract prompt up to and including the last Lora '>'
+            positivePrompt = positivePrompt.substring(0, lastLoraIndex + 1).trim();
+          }
+        }
+        
         if (positivePrompt) {
           result['Prompt'] = positivePrompt;
+        }
+        
+        // Extract negative prompt value (everything after "Negative prompt:" until next parameter or end)
+        let negativePromptStart = negativePromptIndex + negativePromptMatch[0].length;
+        // Find where negative prompt ends (either at newline before next parameter, or comma before next parameter, or end of text)
+        let negativePromptEnd = text.length;
+        
+        // Look for next parameter after negative prompt (like "Steps:", "Sampler:", etc.)
+        // Also check for ADetailer parameters and stop there
+        const nextParamMatch = text.substring(negativePromptStart).match(/\n\s*(Steps|Sampler|CFG|Seed|Size|Model|Schedule|Denoising|Hires|Version|Clip|RNG|Lora|ADetailer)\s*:/i);
+        if (nextParamMatch) {
+          negativePromptEnd = negativePromptStart + nextParamMatch.index;
+        } else {
+          // Check for comma-separated parameters (including ADetailer)
+          const commaParamMatch = text.substring(negativePromptStart).match(/,\s*(Steps|Sampler|CFG|Seed|Size|Model|Schedule|Denoising|Hires|Version|Clip|RNG|Lora|ADetailer)\s*:/i);
+          if (commaParamMatch) {
+            negativePromptEnd = negativePromptStart + commaParamMatch.index;
+          }
+        }
+        
+        let negativePromptValue = text.substring(negativePromptStart, negativePromptEnd).trim();
+        // Remove trailing comma or newline if present
+        negativePromptValue = negativePromptValue.replace(/,\s*$/, '').replace(/\n\s*$/, '').trim();
+        if (negativePromptValue) {
+          result['Negative Prompt'] = negativePromptValue;
         }
       } else {
         // Check if text starts directly with a known parameter
@@ -3049,10 +3720,27 @@
               firstParamIndex = match.index;
             }
           }
+          
+          let promptText = '';
           if (firstParamIndex < text.length) {
-            result['Prompt'] = text.substring(0, firstParamIndex).trim();
+            promptText = text.substring(0, firstParamIndex).trim();
           } else {
-            result['Prompt'] = text;
+            promptText = text;
+          }
+          
+          // If prompt contains Loras, ensure it ends at the last Lora '>'
+          const loraMatches = promptText.match(/<lora:[^>]+>/gi);
+          if (loraMatches && loraMatches.length > 0) {
+            // Find the position of the last Lora tag
+            const lastLoraIndex = promptText.lastIndexOf('>');
+            if (lastLoraIndex >= 0) {
+              // Extract prompt up to and including the last Lora '>'
+              promptText = promptText.substring(0, lastLoraIndex + 1).trim();
+            }
+          }
+          
+          if (promptText) {
+            result['Prompt'] = promptText;
           }
         }
       }
@@ -3074,7 +3762,9 @@
       // Find all patterns that look like parameters: ", ParameterName:" or "ParameterName:" at start
       // Also matches after newlines or > (for parameters after Loras)
       // Pattern: optional comma+whitespace, newline+whitespace, or >+whitespace, then parameter name, then colon
-      const paramPattern = /(?:^|,\s*|\n\s*|>\s*)([^:]+?)\s*:/g;
+      // Updated to better handle newlines and ensure we catch all parameters
+      // Use a more robust pattern that handles start of line, commas, newlines, and > characters
+      const paramPattern = /(?:^|,\s*|\n\s*|>\s*)([A-Za-z][^:\n,]*?)\s*:/g;
       let match;
       while ((match = paramPattern.exec(text)) !== null) {
         const paramName = match[1].trim();
@@ -3117,21 +3807,54 @@
           }
           
           // Find the end of the value
-          // The value ends at the comma before the next parameter, or at the end of text
+          // The value ends at the comma before the next parameter, newline before next parameter, or at the end of text
           let valueEnd = text.length;
           
           // Look for the next parameter match (any parameter, not just ones we care about)
           for (let j = i + 1; j < allParamMatches.length; j++) {
             const nextMatch = allParamMatches[j];
-            // The value ends at the comma before the next parameter
-            // Find the last comma before this next parameter
+            
+            // Skip ADetailer parameters - stop value extraction before them
+            if (nextMatch.name.toLowerCase().includes('adetailer')) {
+              // Find the comma or newline before the ADetailer parameter
+              const commaBeforeADetailer = text.lastIndexOf(',', nextMatch.index);
+              const newlineBeforeADetailer = text.lastIndexOf('\n', nextMatch.index);
+              
+              if (commaBeforeADetailer > valueStart && commaBeforeADetailer < nextMatch.index) {
+                valueEnd = commaBeforeADetailer;
+                break;
+              } else if (newlineBeforeADetailer > valueStart && newlineBeforeADetailer < nextMatch.index) {
+                valueEnd = newlineBeforeADetailer;
+                break;
+              } else if (nextMatch.index > valueStart) {
+                valueEnd = nextMatch.index;
+                break;
+              }
+              continue; // Skip ADetailer parameters entirely
+            }
+            
+            // For comma-separated parameters (most common), find the comma before the next parameter
+            // This handles cases like "Steps: 42, Sampler: ..."
             const commaBeforeNext = text.lastIndexOf(',', nextMatch.index);
-            if (commaBeforeNext > valueStart) {
+            if (commaBeforeNext > valueStart && commaBeforeNext < nextMatch.index) {
               valueEnd = commaBeforeNext;
               break;
             }
-            // If no comma found, the value might extend to the next parameter start
-            // But typically there should be a comma, so let's use the next param index
+            
+            // Check if there's a newline before the next parameter (newline-separated format)
+            // Only use this if no comma was found, or if newline is closer to the value start
+            const newlineBeforeNext = text.lastIndexOf('\n', nextMatch.index);
+            if (newlineBeforeNext > valueStart && newlineBeforeNext < nextMatch.index) {
+              // Check if there's minimal text between newline and parameter (likely a newline-separated parameter)
+              const textBetween = text.substring(newlineBeforeNext + 1, nextMatch.index).trim();
+              // If text between is short (just whitespace and parameter name), use newline as boundary
+              if (textBetween.length < 50 && (commaBeforeNext <= valueStart || newlineBeforeNext < commaBeforeNext)) {
+                valueEnd = newlineBeforeNext;
+                break;
+              }
+            }
+            
+            // If no comma or newline found, the value might extend to the next parameter start
             if (nextMatch.index > valueStart) {
               valueEnd = nextMatch.index;
               break;
@@ -3139,8 +3862,8 @@
           }
           
           let value = text.substring(valueStart, valueEnd).trim();
-          // Remove trailing comma if present
-          value = value.replace(/,\s*$/, '').trim();
+          // Remove trailing comma or newline if present
+          value = value.replace(/,\s*$/, '').replace(/\n\s*$/, '').trim();
           
           if (value) {
             // Map parameter name to display name
