@@ -49,6 +49,7 @@ A standalone web based image gallery viewer for AI-generated images. Automatical
 - **Left-click thumbnail:** Opens image in lightbox (click again to close)
 - **Right-click thumbnail:** View metadata table (click again to close)
 - **Scroll:** Use mouse wheel or click-hold-drag to scroll through images
+- **Favorites:** Click Star to move images to a Favorites folder, click again to move it back to previous folder. 
 
 ## Top Nav Bar
 - **Thumbnail size control:** Adjust size (small, medium, large, huge)
@@ -65,6 +66,7 @@ A standalone web based image gallery viewer for AI-generated images. Automatical
 - **Zoom:** Click-and-hold to zoom, move mouse to pan
 - **Scroll zoom:** Mouse wheel zooms relative to cursor position
 - **Navigation:** Left/right arrow buttons or keyboard arrow keys to navigate between images
+- **Favorites:** Click Star to move images to a Favorites folder, click again to move it back to previous folder.
 
 ## Diffusion Parameter Detail Table (Right Click)
 - View full metadata table showing: Prompt, Model, Sampler, Schedule Type, Size, Steps, CFG Scale, LoRAs, etc.
