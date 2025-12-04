@@ -7,6 +7,37 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- ============================================
+       USER SETTINGS - Edit these values to customize the gallery
+       ============================================ -->
+  <script>
+    // Model Filter Settings
+    // Each model filter has a label (display name) and a containsText (case-insensitive search string)
+    const MODEL_FILTERS = [
+      { label: 'Flux', containsText: 'flux' },
+      { label: 'Qwen', containsText: 'qwen' },
+      { label: 'ZIT', containsText: 'z_image' },
+      { label: 'Wan', containsText: 'wan' },
+      { label: 'XL', containsText: 'xl' },
+      { label: 'Pony', containsText: 'pony' }
+    ];
+    
+    // Image Size Slider Settings
+    const IMAGE_SIZE_SETTINGS = {
+      min: 300,        // Minimum image width in pixels
+      max: 1800,       // Maximum image width in pixels
+      default: 400,    // Default image width in pixels
+      step: 0.1        // Step size for slider (multiplier increment)
+    };
+    
+    // Paging Settings
+    const PAGING_SETTINGS = {
+      options: [50, 100, 250, 500],  // Available page sizes
+      default: 100                    // Default images per page
+    };
+  </script>
+  
   <style>
     html, body {
       margin: 0;
@@ -22,7 +53,7 @@
     .gallery {
       width: 100%;
       min-height: 100vh;
-      padding: 10px 10px 84px 10px;
+      padding: 25px 10px 84px 10px;
       margin-top: 0;
       box-sizing: border-box;
       background: #000;
@@ -31,7 +62,7 @@
       text-align: center;
     }
     .gallery.top-bar-visible {
-      margin-top: 50px;
+      margin-top: 45px;
       padding-top: 15px;
     }
     .gallery.scrolling {
@@ -43,6 +74,15 @@
       width: 600px;
       margin-right: 10px;
     }
+    .no-images-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: gray;
+      font-size: 14pt;
+      text-align: center;
+    }
     .img-container {
       display: block;
       position: relative;
@@ -51,6 +91,39 @@
       border-radius: 5px;
       cursor: pointer;
       break-inside: avoid-column;
+    }
+    .img-container.deleted {
+      cursor: default;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .img-container.deleted .image-wrapper {
+      position: relative;
+    }
+    .img-container.deleted .image-wrapper::after {
+      content: 'Deleted';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 12pt;
+      font-weight: 500;
+      z-index: 10;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .img-container.deleted img {
+      opacity: 0.3;
+      filter: grayscale(100%);
+    }
+    .img-container.deleted .star-button,
+    .img-container.deleted .delete-button,
+    .img-container.deleted .image-buttons {
+      display: none;
     }
     .image-wrapper {
       position: relative;
@@ -75,6 +148,7 @@
       z-index: 1;
       opacity: 0;
       transition: opacity 0.3s ease;
+      will-change: opacity;
     }
     .image-wrapper img.loaded {
       opacity: 1;
@@ -119,7 +193,7 @@
     }
     .image-buttons {
       position: absolute;
-      top: 7px;
+      top: 12px;
       left: 7px;
       display: flex;
       gap: 4px;
@@ -183,7 +257,7 @@
     }
     .star-button {
       position: absolute;
-      top: 7px;
+      top: 12px;
       right: 7px;
       width: 22px;
       height: 22px;
@@ -224,66 +298,41 @@
       fill: #fff;
       transition: fill 0.2s;
     }
-    /* Legacy class names for backwards compatibility */
-    .open-button {
+    .delete-button {
       position: absolute;
-      top: 7px;
+      top: 38px;
       right: 7px;
       width: 22px;
       height: 22px;
-      background: rgba(255, 255, 255, 0.35);
-      border: none;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid #4f4f4f;
       border-radius: 5px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease, background 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
       z-index: 3;
-      opacity: 0.5;
-      transition: opacity 0.2s, background 0.2s;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       padding: 0;
     }
-    .open-button:hover {
-      opacity: 0.7;
-      background: rgba(255, 255, 255, 0.5);
+    .delete-button.favorited {
+      opacity: 0.9;
     }
-    .open-button svg {
+    .img-container:hover .delete-button {
+      opacity: 0.9;
+    }
+    .delete-button:hover {
+      opacity: 1;
+      background: rgba(220, 53, 69, 0.85);
+      border-color: rgba(220, 53, 69, 0.8);
+    }
+    .delete-button svg {
       width: 14px;
       height: 14px;
-      fill: #333;
-    }
-    .copy-prompt-button {
-      position: absolute;
-      top: 7px;
-      left: 7px;
-      width: 22px;
-      height: 22px;
-      background: rgba(255, 255, 255, 0.35);
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 3;
-      opacity: 0.5;
-      transition: opacity 0.2s, background 0.2s;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-      padding: 0;
-    }
-    .copy-prompt-button:hover {
-      opacity: 0.7;
-      background: rgba(255, 255, 255, 0.5);
-    }
-    .copy-prompt-button.copied {
-      background: rgba(76, 175, 80, 0.6);
-      opacity: 0.8;
-    }
-    .copy-prompt-button svg {
-      width: 14px;
-      height: 14px;
-      fill: #333;
+      fill: #fff;
+      transition: fill 0.2s;
     }
     /* ---- Lightbox ---- */
     .lightbox-overlay {
@@ -550,8 +599,6 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 20px;
       padding: 0 20px;
       z-index: 1000;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -559,6 +606,7 @@
       opacity: 0;
       transition: transform 0.3s ease, opacity 0.3s ease;
       pointer-events: none;
+      will-change: transform, opacity;
     }
     .top-nav.visible {
       transform: translateY(0);
@@ -579,13 +627,14 @@
       position: relative;
       display: flex;
       align-items: center;
-      width: 100%;
-      max-width: 250px;
+      width: 140px;
+      max-width: 140px;
+      flex-shrink: 0;
     }
     .search-input {
       width: 100%;
       height: 32px;
-      padding: 0 36px 0 12px;
+      padding: 0 30px 0 12px;
       background: rgba(255, 255, 255, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 16px;
@@ -594,6 +643,7 @@
       font-family: 'Roboto', sans-serif;
       outline: none;
       transition: all 0.2s;
+      box-sizing: border-box;
     }
     .search-input:focus {
       background: rgba(255, 255, 255, 0.15);
@@ -605,7 +655,7 @@
     }
     .search-clear {
       position: absolute;
-      right: 8px;
+      right: 6px;
       width: 20px;
       height: 20px;
       border-radius: 50%;
@@ -620,7 +670,8 @@
       line-height: 1;
       padding: 0;
       transition: all 0.2s;
-      z-index: 1;
+      z-index: 10;
+      flex-shrink: 0;
     }
     .search-clear:hover {
       background: rgba(255, 255, 255, 0.3);
@@ -629,12 +680,90 @@
     .search-clear.visible {
       display: flex;
     }
+    /* ---- Centered Search and Sort Container ---- */
+    .search-sort-container {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 2;
+    }
     /* ---- Sort Buttons ---- */
     .sort-buttons {
       display: flex;
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
+    }
+    /* ---- Right Buttons (Favorites & Reload) ---- */
+    .right-buttons {
+      position: absolute;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      z-index: 2;
+    }
+    /* ---- Model Filter Buttons ---- */
+    .model-filters {
+      position: absolute;
+      left: 20px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      z-index: 2;
+    }
+    .model-filter-btn {
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: #2a2a2a;
+      border: none;
+      color: gray;
+      cursor: pointer;
+      font-family: 'Roboto', sans-serif;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+    .model-filter-btn:hover {
+      background: #3a3a3a;
+      color: #aaa;
+    }
+    .model-filter-btn.active {
+      background: #404040;
+      color: #fff;
+    }
+    .model-filter-btn:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+    .model-filter-btn.indexing {
+      position: relative;
+      overflow: hidden;
+    }
+    .model-filter-btn.indexing::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: #6a6;
+      animation: indexing-progress 2s ease-in-out infinite;
+    }
+    @keyframes indexing-progress {
+      0% { width: 0%; left: 0; }
+      50% { width: 100%; left: 0; }
+      100% { width: 0%; left: 100%; }
+    }
+    .model-filters-status {
+      font-size: 10px;
+      color: #666;
+      margin-left: 6px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
     }
     .sort-btn {
       width: 24px;
@@ -675,8 +804,6 @@
     }
     /* ---- Reload Button ---- */
     .reload-btn {
-      position: absolute;
-      right: 20px;
       width: 24px;
       height: 24px;
       border-radius: 4px;
@@ -711,43 +838,78 @@
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
-    /* ---- Size Control ---- */
+    /* ---- Size Control Slider ---- */
     .size-control {
+      position: absolute;
+      left: 30%;
+      transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex-shrink: 0;
+      width: 126px;
+      max-width: 126px;
+      z-index: 2;
     }
-    .size-circle {
-      width: 5px;
-      height: 5px;
+    .size-slider-container {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+    .size-slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: none;
+    }
+    .size-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: rgba(100, 180, 255, 0.6);
+      border: 2px solid rgba(100, 180, 255, 0.4);
       cursor: pointer;
       transition: all 0.2s;
-      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(100, 180, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
-    .size-circle:nth-child(2) {
-      width: 6.67px;
-      height: 6.67px;
+    .size-slider::-webkit-slider-thumb:hover {
+      background: rgba(100, 180, 255, 0.75);
+      border-color: rgba(100, 180, 255, 0.5);
+      transform: scale(1.15);
+      box-shadow: 0 3px 12px rgba(100, 180, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
-    .size-circle:nth-child(3) {
-      width: 8.33px;
-      height: 8.33px;
+    .size-slider::-webkit-slider-thumb:active {
+      background: rgba(100, 180, 255, 0.85);
+      transform: scale(1.1);
     }
-    .size-circle:nth-child(4) {
-      width: 10px;
-      height: 10px;
+    .size-slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(100, 180, 255, 0.6);
+      border: 2px solid rgba(100, 180, 255, 0.4);
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(100, 180, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
-    .size-circle:hover {
-      background: rgba(255, 255, 255, 0.5);
-      border-color: rgba(255, 255, 255, 0.6);
+    .size-slider::-moz-range-thumb:hover {
+      background: rgba(100, 180, 255, 0.75);
+      border-color: rgba(100, 180, 255, 0.5);
+      transform: scale(1.15);
+      box-shadow: 0 3px 12px rgba(100, 180, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
-    .size-circle.active {
-      background: rgba(255, 255, 255, 0.8);
-      border-color: rgba(255, 255, 255, 1);
-      box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+    .size-slider::-moz-range-thumb:active {
+      background: rgba(100, 180, 255, 0.85);
+      transform: scale(1.1);
     }
     /* ---- Loading Bar ---- */
     .loading-bar-container {
@@ -831,9 +993,6 @@
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
-    }
-    .bottom-nav.hidden {
-      display: none;
     }
     .pagination-arrow {
       width: 28px;
@@ -966,38 +1125,50 @@
 </head>
 <body>
   <div class="top-nav">
+    <div class="model-filters" id="modelFilters">
+      <!-- Model filter buttons will be generated from MODEL_FILTERS settings -->
+      <span class="model-filters-status"></span>
+    </div>
     <div class="size-control">
-      <div class="size-circle active" data-size="0.6" title="Small"></div>
-      <div class="size-circle" data-size="0.8" title="Medium"></div>
-      <div class="size-circle" data-size="1.0" title="Large"></div>
-      <div class="size-circle" data-size="1.2" title="Huge"></div>
+      <div class="size-slider-container">
+        <input type="range" class="size-slider" id="sizeSlider" 
+               min="1.0" 
+               max="6.0" 
+               step="0.1" 
+               value="1.0" 
+               title="Image Size">
+      </div>
     </div>
-    <div class="search-wrapper">
-      <input type="text" class="search-input" id="searchInput" />
-      <button class="search-clear" id="searchClear" aria-label="Clear search">×</button>
+    <div class="search-sort-container">
+      <div class="search-wrapper">
+        <input type="text" class="search-input" id="searchInput" />
+        <button class="search-clear" id="searchClear" aria-label="Clear search">×</button>
+      </div>
+      <div class="sort-buttons">
+        <button class="sort-btn" id="sortFilename" title="Sort by filename">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M7 10l5 5 5-5z"/>
+          </svg>
+        </button>
+        <button class="sort-btn" id="sortDate" title="Sort by date">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
+          </svg>
+        </button>
+      </div>
     </div>
-    <div class="sort-buttons">
-      <button class="sort-btn" id="sortFilename" title="Sort by filename">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path d="M7 10l5 5 5-5z"/>
-        </svg>
-      </button>
-      <button class="sort-btn" id="sortDate" title="Sort by date">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
-        </svg>
-      </button>
+    <div class="right-buttons">
       <button class="sort-btn" id="favoritesFilter" title="Show favorites only">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
           <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
         </svg>
       </button>
+      <button class="reload-btn" id="reloadBtn" title="Rescan folders and reload images">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
     </div>
-    <button class="reload-btn" id="reloadBtn" title="Rescan folders and reload images">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-      </svg>
-    </button>
   </div>
   <div class="gallery" id="gallery"></div>
   <div class="bottom-nav hidden" id="bottomNav">
@@ -1073,6 +1244,16 @@
     </div>
   </div>
   <script>
+    // Production debug flag - set to false to disable debug logging
+    const DEBUG_MODE = false;
+    
+    // Debug logging helper
+    function debugLog(...args) {
+      if (DEBUG_MODE) {
+        console.log(...args);
+      }
+    }
+    
     // Calculate scrollbar width and adjust top nav
     function getScrollbarWidth() {
       const outer = document.createElement('div');
@@ -1366,8 +1547,11 @@
     let allImageContainers = [];
     let allImageFiles = [];
     let galleryColumns = [];
-    let currentSizeMultiplier = 0.6; // Default size (smallest circle)
-    const baseColumnWidth = 600;
+    // Initialize from settings
+    const baseColumnWidth = IMAGE_SIZE_SETTINGS.min;
+    const maxColumnWidth = IMAGE_SIZE_SETTINGS.max;
+    const defaultSizeMultiplier = IMAGE_SIZE_SETTINGS.default / IMAGE_SIZE_SETTINGS.min;
+    let currentSizeMultiplier = defaultSizeMultiplier;
     let currentLightboxIndex = -1; // Track current image index in lightbox
     let isNavigating = false; // Flag to prevent closing during navigation
     let scrollPositionBeforeLightbox = 0; // Store scroll position before opening lightbox
@@ -1376,6 +1560,7 @@
       date: null
     };
     let showFavoritesOnly = false; // Track favorites filter state
+    let activeModelFilter = null; // Track active model filter: 'flux', 'xl', 'pony', or null
     let favoriteOriginalPaths = new Map(); // Track original paths of favorited images: filename -> originalPath (in-memory cache)
     const HISTORY_STORAGE_KEY = 'favoritesHistory'; // localStorage key for history
     
@@ -1389,7 +1574,7 @@
           Object.entries(history).forEach(([favoritesPath, originalPath]) => {
             favoriteOriginalPaths.set(favoritesPath, originalPath);
           });
-          console.log('Loaded favorites history:', Object.keys(history).length, 'entries');
+          debugLog('Loaded favorites history:', Object.keys(history).length, 'entries');
           return true;
         }
       } catch (error) {
@@ -1435,9 +1620,169 @@
     let imageSearchIndex = new Map(); // Index for search: filename -> {model, prompt}
     let imageDimensionsCache = new Map(); // Cache image dimensions: filename -> {width, height}
     let preloadQueue = []; // Queue for preloading next page images
+    let allMetadataFetched = false; // Track if we've fetched metadata for all images
+    let metadataFetchInProgress = false; // Track if fetch is currently running
+    
+    // Function to log actions to the server
+    function logToServer(action, details) {
+      fetch('/log-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, details, timestamp: new Date().toISOString() })
+      }).catch(() => {}); // Ignore errors for logging
+    }
+    
+    // Update model filter buttons to show indexing state
+    function updateModelFilterButtonsState(isIndexing, progress = null) {
+      const btns = document.querySelectorAll('.model-filter-btn');
+      const statusEl = document.querySelector('.model-filters-status');
+      
+      if (isIndexing) {
+        btns.forEach(btn => btn.classList.add('indexing'));
+        if (statusEl && progress !== null) {
+          statusEl.textContent = `Loading Metadata: ${progress}%`;
+        }
+      } else {
+        btns.forEach(btn => btn.classList.remove('indexing'));
+        if (statusEl) {
+          statusEl.textContent = '';
+        }
+      }
+    }
+    
+    // Function to fetch metadata for all images (for model filtering)
+    async function fetchAllImageMetadata(isBackground = false) {
+      if (allMetadataFetched) {
+        debugLog('[Model Filter] Metadata already fetched, skipping');
+        return;
+      }
+      
+      if (metadataFetchInProgress) {
+        debugLog('[Model Filter] Fetch already in progress, waiting...');
+        // Wait for existing fetch to complete
+        while (metadataFetchInProgress) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return;
+      }
+      
+      metadataFetchInProgress = true;
+      
+      try {
+        const unindexedFiles = allImageFiles.filter(f => !imageSearchIndex.has(f));
+        const total = unindexedFiles.length;
+        debugLog(`[Model Filter] ${isBackground ? 'Background indexing' : 'Fetching'} metadata for ${total} images...`);
+        logToServer('metadata_fetch_start', { count: total, background: isBackground });
+        
+        if (total === 0) {
+          allMetadataFetched = true;
+          metadataFetchInProgress = false;
+          updateModelFilterButtonsState(false);
+          debugLog('[Model Filter] All images already indexed');
+          return;
+        }
+        
+        // Show indexing state
+        updateModelFilterButtonsState(true, 0);
+        
+        // Fetch metadata in batches to avoid overwhelming the browser
+        const BATCH_SIZE = isBackground ? 10 : 20; // Smaller batches for background
+        let processed = 0;
+        let errors = 0;
+        
+        for (let i = 0; i < unindexedFiles.length; i += BATCH_SIZE) {
+          const batch = unindexedFiles.slice(i, i + BATCH_SIZE);
+          
+          const results = await Promise.allSettled(batch.map(async (filename) => {
+            if (imageSearchIndex.has(filename)) return { skipped: true };
+            
+            const url = escapeFilename(filename);
+            const metadata = await getPngMetadata(url);
+            const displayData = formatMetadataForDisplay(metadata);
+            
+            const model = (displayData['Model'] || '').toLowerCase();
+            imageSearchIndex.set(filename, {
+              model: model,
+              prompt: (displayData['Prompt'] || '').toLowerCase()
+            });
+            
+            return { filename, model };
+          }));
+          
+          // Process results
+          results.forEach((result, idx) => {
+            if (result.status === 'fulfilled') {
+              if (!result.value?.skipped) processed++;
+            } else {
+              errors++;
+              const filename = batch[idx];
+              // Store empty data for failed extractions
+              if (!imageSearchIndex.has(filename)) {
+                imageSearchIndex.set(filename, { model: '', prompt: '' });
+              }
+            }
+          });
+          
+          // Update progress
+          const progressPct = Math.round(((i + batch.length) / total) * 100);
+          updateModelFilterButtonsState(true, progressPct);
+          
+          if ((i + BATCH_SIZE) % 100 === 0 || i + BATCH_SIZE >= total) {
+            debugLog(`[Model Filter] Processed ${Math.min(i + BATCH_SIZE, total)}/${total} (${errors} errors)`);
+          }
+          
+          // Yield to browser for background processing
+          if (isBackground) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
+        
+        allMetadataFetched = true;
+        updateModelFilterButtonsState(false);
+        debugLog(`[Model Filter] Complete: ${processed} indexed, ${errors} errors`);
+        logToServer('metadata_fetch_complete', { indexed: processed, errors, background: isBackground });
+        
+      } catch (err) {
+        console.error('[Model Filter] Fatal error during metadata fetch:', err);
+        logToServer('metadata_fetch_error', { error: err.message });
+        updateModelFilterButtonsState(false);
+        // Still mark as fetched to avoid infinite retries
+        allMetadataFetched = true;
+      } finally {
+        metadataFetchInProgress = false;
+      }
+    }
+    
+    let initialPageLoaded = false; // Track if first page has finished loading
+    let backgroundIndexingScheduled = false; // Prevent multiple scheduling
+    
+    // Start background metadata indexing after images are loaded
+    function startBackgroundMetadataIndexing() {
+      if (backgroundIndexingScheduled) return;
+      backgroundIndexingScheduled = true;
+      
+      // Will be called when initial page finishes loading
+      debugLog('[Model Filter] Background indexing scheduled, waiting for images to load...');
+    }
+    
+    // Actually start the background indexing (called when page images finish loading)
+    function triggerBackgroundMetadataIndexing() {
+      if (!backgroundIndexingScheduled) return;
+      if (allMetadataFetched || metadataFetchInProgress) return;
+      
+      // Wait a bit after images load to let the browser settle
+      setTimeout(() => {
+        if (!allMetadataFetched && !metadataFetchInProgress) {
+          debugLog('[Model Filter] Images loaded, starting background metadata indexing...');
+          logToServer('metadata_background_start', { trigger: 'images_loaded' });
+          fetchAllImageMetadata(true);
+        }
+      }, 500);
+    }
     let intersectionObserver = null; // Observer for visible images
     let layoutCache = null; // Cache for layout calculations
     let resizeThrottle = null; // Throttle for resize events
+    let searchDebounce = null; // Debounce for search input
     
     // Helper: Get image dimensions (cached or fetch)
     async function getImageDimensions(filename) {
@@ -1528,9 +1873,8 @@
     
     // Pagination state
     let currentPage = 1;
-    let imagesPerPage = 100;
+    let imagesPerPage = PAGING_SETTINGS.default;
     let filteredImageFiles = []; // Images after filtering
-    let filteredImageContainers = []; // Containers after filtering
     
     // Favorite functionality
     function getFavoritesFolderPath(filename) {
@@ -1591,10 +1935,10 @@
           const historyPath = getOriginalPathFromHistory(filename);
           if (historyPath) {
             newPath = historyPath.replace(/\\/g, '/');
-            console.log('Unfavoriting: Using history path', oldPath, '->', newPath);
+            debugLog('Unfavoriting: Using history path', oldPath, '->', newPath);
           } else {
             newPath = getOriginalPathFromFavorites(filename).replace(/\\/g, '/');
-            console.log('Unfavoriting: Using fallback path', oldPath, '->', newPath);
+            debugLog('Unfavoriting: Using fallback path', oldPath, '->', newPath);
           }
           // Remove from history
           removeFromHistory(filename);
@@ -1603,12 +1947,12 @@
           // The file is currently at: filename (e.g., "2025-11-17/image.jpg")
           oldPath = filename;
           newPath = getFavoritesFolderPath(filename).replace(/\\/g, '/');
-          console.log('Favoriting: Moving', oldPath, '->', newPath);
+          debugLog('Favoriting: Moving', oldPath, '->', newPath);
           // Store original path in history (localStorage)
           addToHistory(newPath, oldPath);
         }
         
-        console.log('Moving file:', { oldPath, newPath });
+        debugLog('Moving file:', { oldPath, newPath });
         
         // Use fetch to move the file (this is a server-side operation)
         // Note: This requires server support for file operations
@@ -1699,6 +2043,108 @@
       } catch (error) {
         console.error('Error toggling favorite:', error);
         alert('Error updating favorite: ' + error.message);
+      }
+    }
+    
+    // Delete image function
+    async function deleteImage(filename, container) {
+      // Show confirmation dialog
+      const confirmed = confirm(`Are you sure you want to delete this image?\n\n${filename}\n\nThis action cannot be undone.`);
+      if (!confirmed) {
+        return;
+      }
+      
+      try {
+        // Normalize the filename path
+        filename = filename.replace(/\\/g, '/');
+        
+        // Mark container as deleted immediately (visual feedback)
+        container.classList.add('deleted');
+        container.style.pointerEvents = 'none';
+        
+        // Call delete endpoint
+        const response = await fetch('/delete-file', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filePath: filename
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Remove from arrays so it doesn't show in filters/search
+          const indexInAll = allImageFiles.indexOf(filename);
+          if (indexInAll !== -1) {
+            allImageFiles.splice(indexInAll, 1);
+          }
+          
+          const indexInFiltered = filteredImageFiles.indexOf(filename);
+          if (indexInFiltered !== -1) {
+            filteredImageFiles.splice(indexInFiltered, 1);
+          }
+          
+          // Keep container in allImageContainers to preserve layout position
+          // Just mark it as deleted so it's visually distinct but doesn't affect layout
+          container.dataset.deleted = 'true';
+          
+          // Remove from search index
+          imageSearchIndex.delete(filename);
+          imageDimensionsCache.delete(filename);
+          
+          // Remove click handler to prevent lightbox opening
+          // Clone the container to remove all event listeners
+          const newContainer = container.cloneNode(true);
+          container.parentNode.replaceChild(newContainer, container);
+          newContainer.classList.add('deleted');
+          newContainer.style.pointerEvents = 'none';
+          newContainer.dataset.deleted = 'true';
+          
+          // Update the container reference in allImageContainers
+          const containerIndex = allImageContainers.indexOf(container);
+          if (containerIndex !== -1) {
+            allImageContainers[containerIndex] = newContainer;
+          }
+          
+          // Update image count (layout stays the same, so no need to recalculate)
+          updateImageCount();
+          
+          // If lightbox is showing this image, close it
+          const lightbox = document.getElementById('lightbox');
+          if (lightbox && lightbox.style.display !== 'none') {
+            const lightboxImg = document.getElementById('lightboxImg');
+            if (lightboxImg && lightboxImg.src && lightboxImg.src.includes(escapeFilename(filename))) {
+              closeLightbox();
+            }
+          }
+          
+          logToServer('image_deleted', { filename });
+        } else {
+          // Revert visual state on error
+          container.classList.remove('deleted');
+          container.style.pointerEvents = '';
+          
+          let errorMessage = 'Failed to delete image.';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          }
+          console.error('Failed to delete file:', errorMessage);
+          alert('Failed to delete image: ' + errorMessage);
+        }
+      } catch (error) {
+        // Revert visual state on error
+        container.classList.remove('deleted');
+        container.style.pointerEvents = '';
+        
+        console.error('Error deleting image:', error);
+        alert('Error deleting image: ' + error.message);
       }
     }
     
@@ -1896,6 +2342,9 @@
       const totalPages = getTotalPages();
       if (page < 1 || page > totalPages) return;
       
+      debugLog(`[Page] Going to page ${page}/${totalPages}`);
+      logToServer('page_change', { page, totalPages, imagesPerPage });
+      
       // Invalidate layout cache when changing pages
       layoutCache = null;
       
@@ -1934,7 +2383,7 @@
       }
     }
     
-    function loadCurrentPage() {
+    function loadCurrentPage(preserveScroll = false) {
       const gallery = document.getElementById('gallery');
       if (!gallery) return;
       
@@ -2004,6 +2453,12 @@
             layoutCache = null;
             window.finalLayoutTimeout = setTimeout(() => {
               layoutMasonry();
+              
+              // Start background metadata indexing after first page loads
+              if (!initialPageLoaded) {
+                initialPageLoaded = true;
+                triggerBackgroundMetadataIndexing();
+              }
             }, 200);
           }, 300);
         }
@@ -2023,9 +2478,29 @@
         window.finalLayoutTimeout = null;
       }
       
+      // Preserve deleted containers before clearing
+      const deletedContainers = Array.from(document.querySelectorAll('.img-container.deleted'));
+      
       gallery.innerHTML = '';
       galleryColumns = [];
       allImageContainers = [];
+      
+      // Show "No Images Found" message if there are no images
+      if (pageFiles.length === 0) {
+        const noImagesMsg = document.createElement('div');
+        noImagesMsg.className = 'no-images-message';
+        noImagesMsg.textContent = 'No Images Found';
+        gallery.appendChild(noImagesMsg);
+        
+        // Hide loading bar and show image count
+        if (loadingBarContainer) {
+          loadingBarContainer.classList.add('hidden');
+        }
+        if (imageCountEl) {
+          imageCountEl.style.display = '';
+        }
+        return;
+      }
       
       // No intersection observer needed - we load all images immediately
       
@@ -2096,6 +2571,17 @@
           if (img.naturalHeight && img.naturalWidth) {
             const aspectRatio = img.naturalHeight / img.naturalWidth;
             wrapper.style.minHeight = (maxWidth * aspectRatio) + 'px';
+            
+            // Debounced layout recalculation as images load
+            // This ensures the masonry grid updates smoothly
+            if (!window.imageLoadLayoutTimeout) {
+              window.imageLoadLayoutTimeout = null;
+            }
+            clearTimeout(window.imageLoadLayoutTimeout);
+            window.imageLoadLayoutTimeout = setTimeout(() => {
+              layoutCache = null;
+              layoutMasonry();
+            }, 50);
           }
           
           metadataQueue.push({ img, label, baseFilename, copyPromptBtn, container, filename });
@@ -2211,7 +2697,7 @@
           if (!imageLoadHandled && img.src) {
             // Only mark as error if image is actually in error state
             if (img.complete && img.naturalWidth === 0) {
-              console.warn('Image load timeout (60s):', filename);
+              if (DEBUG_MODE) console.warn('Image load timeout (60s):', filename);
               img.removeEventListener('load', handleImageLoad);
               img.removeEventListener('error', handleImageError);
               handleImageError();
@@ -2251,10 +2737,26 @@
           toggleFavorite(currentFilename, starButton);
         });
 
+        // Create delete button (underneath star button)
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'delete-button';
+        deleteButton.setAttribute('data-label', 'Delete image');
+        deleteButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+        deleteButton.dataset.filename = filename;
+        
+        deleteButton.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          const currentFilename = this.dataset.filename || filename;
+          deleteImage(currentFilename, container);
+        });
+
         wrapper.appendChild(img);
         wrapper.appendChild(label);
         wrapper.appendChild(buttonContainer);
         wrapper.appendChild(starButton);
+        wrapper.appendChild(deleteButton);
         container.appendChild(wrapper);
 
         container.addEventListener('click', function(e) {
@@ -2265,6 +2767,12 @@
 
         // Add to containers array immediately
         allImageContainers.push(container);
+      });
+      
+      // Re-add deleted containers after new containers (they'll be positioned by masonry)
+      // Note: deletedContainers was preserved before clearing gallery at the start of this function
+      deletedContainers.forEach(deletedContainer => {
+        allImageContainers.push(deletedContainer);
       });
       
       // Layout masonry immediately with containers (don't wait for dimensions)
@@ -2290,6 +2798,28 @@
         filtered = allImageFiles.filter(filename => isFavorited(filename));
       } else {
         filtered = [...allImageFiles];
+      }
+      
+      // Apply model filter if active
+      if (activeModelFilter) {
+        // Get the contains text from the active button
+        const activeButton = document.querySelector(`.model-filter-btn[data-model="${activeModelFilter}"]`);
+        const containsText = activeButton ? (activeButton.getAttribute('data-contains') || activeModelFilter).toLowerCase() : activeModelFilter.toLowerCase();
+        
+        filtered = filtered.filter(filename => {
+          // Check global metadata index
+          const metadata = imageSearchIndex.get(filename);
+          if (metadata && metadata.model) {
+            return metadata.model.toLowerCase().includes(containsText);
+          }
+          // Check container data for images not yet indexed
+          const container = allImageContainers.find(c => c.dataset.filename === filename);
+          if (container && container.dataset.modelName) {
+            return container.dataset.modelName.toLowerCase().includes(containsText);
+          }
+          // If no metadata available yet, exclude from filtered results
+          return false;
+        });
       }
       
       if (currentQuery.length < 2) {
@@ -2343,14 +2873,36 @@
         filteredImageFiles = Array.from(filteredSet);
       }
       
-      // Invalidate layout cache when filtering
+      // Invalidate layout cache and clear columns when filtering
       layoutCache = null;
+      galleryColumns = [];
+      
+      // Clear any pending layout timeouts
+      if (window.imageLoadLayoutTimeout) {
+        clearTimeout(window.imageLoadLayoutTimeout);
+        window.imageLoadLayoutTimeout = null;
+      }
+      if (window.finalLayoutTimeout) {
+        clearTimeout(window.finalLayoutTimeout);
+        window.finalLayoutTimeout = null;
+      }
       
       // Update pagination UI
       updatePaginationUI();
       
       // Update image count
       updateImageCount();
+      
+      // Log filter results
+      if (currentQuery.length >= 2 || activeModelFilter || showFavoritesOnly) {
+        debugLog(`[Filter] Results: ${filteredImageFiles.length} images (search: "${currentQuery}", model: ${activeModelFilter || 'none'}, favorites: ${showFavoritesOnly})`);
+        logToServer('filter_applied', { 
+          resultCount: filteredImageFiles.length, 
+          searchQuery: currentQuery.length >= 2 ? currentQuery : '',
+          modelFilter: activeModelFilter,
+          favoritesOnly: showFavoritesOnly
+        });
+      }
       
       // Load current page (will create containers for filtered images)
       loadCurrentPage();
@@ -2434,183 +2986,40 @@
     // Embedded image list - injected by inject_image_list.py
     // IMAGE_LIST_PLACEHOLDER
     const embeddedImageList = [
-  "2025-11-24/00032-2754017781-swapped.png",
-  "2025-11-24/00033-2754017781-swapped.png",
-  "2025-11-24/00034-2754017781-swapped.png",
-  "2025-11-24/00036-2754017781-swapped.png",
-  "2025-11-24/00037-2754017781-swapped.png",
-  "2025-11-24/00038-2754017781-swapped.png",
-  "2025-11-24/00039-2754017781-swapped.png",
-  "2025-11-24/00041-2754017781-swapped.png",
-  "2025-11-24/00042-2754017781-swapped.png",
-  "2025-11-24/00045-2754017781-swapped.png",
-  "2025-11-24/00046-2754017781-swapped.png",
-  "2025-11-24/00047-2754017781-swapped.png",
-  "2025-11-24/00048-2754017781-swapped.png",
-  "2025-11-24/00050-2754017781-swapped.png",
-  "2025-11-24/00051-2754017781-swapped.png",
-  "2025-11-24/00052-2754017781-swapped.png",
-  "2025-11-24/00053-2754017781-swapped.png",
-  "2025-11-24/00054-2754017781-swapped.png",
-  "2025-11-24/00055-2754017781-swapped.png",
-  "2025-11-24/00056-2754017781-swapped.png",
-  "2025-11-24/00057-2754017781-swapped.png",
-  "2025-11-24/00058-2754017781-swapped.png",
-  "2025-11-24/00059-2754017781-swapped.png",
-  "2025-11-24/00061-2754017781-swapped.png",
-  "2025-11-24/00062-2754017781-swapped.png",
-  "2025-11-24/00064-2754017781-swapped.png",
-  "2025-11-24/00065-2754017781-swapped.png",
-  "2025-11-24/00066-2754017781-swapped.png",
-  "2025-11-24/00067-2754017781-swapped.png",
-  "2025-11-24/00068-2754017781-swapped.png",
-  "2025-11-24/00069-2754017781-swapped.png",
-  "2025-11-24/00070-2754017781-swapped.png",
-  "2025-11-24/00071-2754017781-swapped.png",
-  "2025-11-24/00072-2754017781-swapped.png",
-  "2025-11-24/00073-2754017781-swapped.png",
-  "2025-11-24/00074-2754017781-swapped.png",
-  "2025-11-24/00075-2754017781-swapped.png",
-  "2025-11-24/00076-2754017781-swapped.png",
-  "2025-11-24/00078-2754017781-swapped.png",
-  "2025-11-24/00079-2754017781-swapped.png",
-  "2025-11-24/00080-2754017781-swapped.png",
-  "2025-11-24/00081-2754017781-swapped.png",
-  "2025-11-24/00082-2754017781-swapped.png",
-  "2025-11-24/00083-2754017781-swapped.png",
-  "2025-11-24/00084-2754017781-swapped.png",
-  "2025-11-24/00085-2754017781-swapped.png",
-  "2025-11-24/00086-2754017781-swapped.png",
-  "2025-11-24/00087-2754017781-swapped.png",
-  "2025-11-24/00088-2754017781-swapped.png",
-  "2025-11-24/00089-2754017781-swapped.png",
-  "2025-11-24/00090-2754017781-swapped.png",
-  "2025-11-24/00091-2754017781-swapped.png",
-  "2025-11-24/00092-2754017781-swapped.png",
-  "2025-11-24/00093-2754017781-swapped.png",
-  "2025-11-24/00095-2754017781-swapped.png",
-  "2025-11-24/00096-2754017781-swapped.png",
-  "2025-11-24/00097-2754017781-swapped.png",
-  "2025-11-24/00099-2754017781-swapped.png",
-  "2025-11-24/00100-2754017781-swapped.png",
-  "2025-11-24/00101-2754017781-swapped.png",
-  "2025-11-24/00102-2754017781-swapped.png",
-  "2025-11-24/00103-2754017781-swapped.png",
-  "2025-11-24/00104-2754017781-swapped.png",
-  "2025-11-24/00105-2754017781-swapped.png",
-  "2025-11-24/00106-2754017781-swapped.png",
-  "2025-11-24/00107-2754017781-swapped.png",
-  "2025-11-24/00108-2754017781-swapped.png",
-  "2025-11-24/00109-2754017781-swapped.png",
-  "2025-11-24/00110-2754017781-swapped.png",
-  "2025-11-24/00111-2754017781-swapped.png",
-  "2025-11-24/00112-2754017781-swapped.png",
-  "2025-11-24/00113-2754017781-swapped.png",
-  "2025-11-24/00114-2754017781-swapped.png",
-  "2025-11-24/00116-2754017781-swapped.png",
-  "2025-11-24/00117-2754017781-swapped.png",
-  "2025-11-24/00118-2754017781-swapped.png",
-  "2025-11-24/00119-2754017781-swapped.png",
-  "2025-11-24/00120-2754017781-swapped.png",
-  "2025-11-24/00121-2754017781-swapped.png",
-  "2025-11-24/00122-2754017781-swapped.png",
-  "2025-11-24/00123-2754017781-swapped.png",
-  "2025-11-24/00124-2754017781-swapped.png",
-  "2025-11-24/00125-2754017781-swapped.png",
-  "2025-11-24/00126-2754017781-swapped.png",
-  "2025-11-24/00127-2754017781-swapped.png",
-  "2025-11-24/00128-2754017781-swapped.png",
-  "2025-11-24/00129-2754017781-swapped.png",
-  "2025-11-24/00130-2754017781-swapped.png",
-  "2025-11-24/00131-2754017781-swapped.png",
-  "2025-11-24/00132-2754017781-swapped.png",
-  "2025-11-24/00133-2754017781-swapped.png",
-  "2025-11-24/00134-2754017781-swapped.png",
-  "2025-11-24/00135-2754017781-swapped.png",
-  "2025-11-24/00136-2754017781-swapped.png",
-  "2025-11-24/00137-2754017781-swapped.png",
-  "2025-11-24/00138-2754017781-swapped.png",
-  "2025-11-24/00139-2754017781-swapped.png",
-  "2025-11-24/00140-2754017781-swapped.png",
-  "2025-11-24/00141-2754017781-swapped.png",
-  "2025-11-24/00142-2754017781-swapped.png",
-  "2025-11-24/00143-2754017781-swapped.png",
-  "2025-11-24/00146-2754017781-swapped.png",
-  "2025-11-24/00147-2754017781-swapped.png",
-  "2025-11-24/00148-2754017781-swapped.png",
-  "2025-11-24/00149-2754017781-swapped.png",
-  "2025-11-24/00150-2754017781-swapped.png",
-  "2025-11-24/00151-2754017781-swapped.png",
-  "2025-11-24/00152-2754017781-swapped.png",
-  "2025-11-24/00153-2754017781-swapped.png",
-  "2025-11-24/00154-2754017781-swapped.png",
-  "2025-11-24/00155-2754017781-swapped.png",
-  "2025-11-24/00156-2754017781-swapped.png",
-  "2025-11-24/00157-2754017781-swapped.png",
-  "2025-11-24/00158-2754017781-swapped.png",
-  "2025-11-24/00159-2754017781-swapped.png",
-  "2025-11-24/00160-2754017781-swapped.png",
-  "2025-11-24/00161-2754017781-swapped.png",
-  "2025-11-24/00162-2754017781-swapped.png",
-  "2025-11-24/00163-2754017781-swapped.png",
-  "2025-11-24/00164-2754017781-swapped.png",
-  "2025-11-24/00165-2754017781-swapped.png",
-  "2025-11-24/00166-2754017781-swapped.png",
-  "2025-11-24/00167-2754017781-swapped.png",
-  "2025-11-24/00168-2754017781-swapped.png",
-  "2025-11-24/00169-2754017781-swapped.png",
-  "2025-11-24/00170-2754017781-swapped.png",
-  "2025-11-24/00171-2754017781-swapped.png",
-  "2025-11-24/00172-2754017781-swapped.png",
-  "2025-11-24/00174-2754017781-swapped.png",
-  "2025-11-24/00175-2754017781-swapped.png",
-  "2025-11-24/00176-2754017781-swapped.png",
-  "2025-11-24/00177-2754017781-swapped.png",
-  "2025-11-24/00179-2754017781-swapped.png",
-  "2025-11-24/00180-2754017781-swapped.png",
-  "2025-11-24/00181-2754017781-swapped.png",
-  "2025-11-24/00182-2754017781-swapped.png",
-  "2025-11-24/00183-2754017781-swapped.png",
-  "2025-11-24/00184-2754017781-swapped.png",
-  "2025-11-24/00185-2754017781-swapped.png",
-  "2025-11-24/00187-2754017781-swapped.png",
-  "2025-11-24/00188-2754017781-swapped.png",
-  "2025-11-24/00189-2754017781-swapped.png",
-  "2025-11-24/00190-2754017781-swapped.png",
-  "2025-11-24/00191-2754017781-swapped.png",
-  "2025-11-24/00192-2754017781-swapped.png",
-  "2025-11-24/00193-2754017781-swapped.png",
-  "2025-11-24/00194-2754017781-swapped.png",
-  "2025-11-24/00195-2754017781-swapped.png",
-  "2025-11-24/00196-2754017781-swapped.png",
-  "2025-11-24/00197-2754017781-swapped.png",
-  "2025-11-24/00199-2754017781-swapped.png",
-  "2025-11-24/Complete_AI-Jennifer-0049.png",
-  "Favorites/00000-16188927-swapped.png",
-  "Favorites/00011-2754017781-swapped.png",
-  "Favorites/00012-2754017781-swapped.png",
-  "Favorites/00013-2754017781-swapped.png",
-  "Favorites/00017-2754017781-swapped.png",
-  "Favorites/00021-2754017781-swapped.png",
-  "Favorites/00024-2754017781-swapped.png",
-  "Favorites/00031-2754017781-swapped.png",
-  "Favorites/00035-2754017781-swapped.png",
-  "Favorites/00040-2754017781-swapped.png",
-  "Favorites/00043-2754017781-swapped.png",
-  "Favorites/00044-2754017781-swapped.png",
-  "Favorites/00049-2754017781-swapped.png",
-  "Favorites/00060-2754017781-swapped.png",
-  "Favorites/00063-2754017781-swapped.png",
-  "Favorites/00077-2754017781-swapped.png",
-  "Favorites/00094-2754017781-swapped.png",
-  "Favorites/00098-2754017781-swapped.png",
-  "Favorites/00115-2754017781-swapped.png",
-  "Favorites/00144-2754017781-swapped.png",
-  "Favorites/00145-2754017781-swapped.png",
-  "Favorites/00173-2754017781-swapped.png",
-  "Favorites/00178-2754017781-swapped.png",
-  "Favorites/00186-2754017781-swapped.png",
-  "Favorites/00198-2754017781-swapped.png"
+  "2025-11-25/00000-3326279137.png",
+  "2025-11-25/00001-3326279137-swapped.png",
+  "2025-11-25/00002-3104822491.png",
+  "2025-11-25/00003-3104822491-swapped.png",
+  "2025-11-25/00004-2725376216.png",
+  "2025-11-25/00005-2725376216-swapped.png",
+  "2025-11-25/00006-1460379678.png",
+  "2025-11-25/00007-1460379678-swapped.png",
+  "2025-11-25/00008-3025396646.png",
+  "2025-11-25/00009-3025396646-swapped.png",
+  "2025-11-25/00010-1208407017.png",
+  "2025-11-25/00011-1208407017-swapped.png",
+  "2025-11-25/00012-548204485.png",
+  "2025-11-25/00013-548204485-swapped.png",
+  "2025-11-25/00014-2516089774.png",
+  "2025-11-25/00015-2516089774-swapped.png",
+  "2025-11-25/00016-4186161600-swapped.png",
+  "2025-11-25/00017-4186161600-swapped.png",
+  "2025-11-25/00018-4186161600-swapped.png",
+  "2025-11-25/00019-4186161600-swapped.png",
+  "2025-11-25/00020-4186161600-swapped.png",
+  "2025-11-25/00021-4186161600-swapped.png",
+  "2025-11-25/00022-4186161600-swapped.png",
+  "2025-11-25/00023-4186161600-swapped.png",
+  "2025-11-25/00024-4186161600-swapped.png",
+  "2025-11-25/00025-4186161600-swapped.png",
+  "2025-11-25/00026-4186161600-swapped.png",
+  "2025-11-25/00027-4186161600-swapped.png",
+  "2025-11-25/00028-4186161600-swapped.png",
+  "2025-11-25/00029-4186161600-swapped.png",
+  "2025-11-25/00030-4186161600-swapped.png",
+  "Favorites/00014-2585734268-swapped.png",
+  "Favorites/00030-1676778117-swapped.png",
+  "Favorites/00044-159259098-swapped.png"
 ];
     
     // Function to initialize/reinitialize the gallery
@@ -2623,6 +3032,13 @@
       gallery.innerHTML = '';
       allImageContainers = [];
       
+      // Reset metadata index for fresh scan
+      imageSearchIndex.clear();
+      allMetadataFetched = false;
+      metadataFetchInProgress = false;
+      initialPageLoaded = false;
+      backgroundIndexingScheduled = false;
+      
       // Reset pagination
       currentPage = 1;
       
@@ -2634,7 +3050,6 @@
       
       // Initialize filtered arrays (all images initially)
       filteredImageFiles = [...allImageFiles];
-      filteredImageContainers = []; // Will be populated as pages are loaded
       
       // Initialize pagination UI
       updatePaginationUI();
@@ -2682,7 +3097,11 @@
         // Reinitialize gallery with new image list
         initializeGallery(data.images);
         
-        console.log(`Reloaded ${data.count} images`);
+        // Restart background metadata indexing
+        startBackgroundMetadataIndexing();
+        
+        debugLog(`[Reload] Reloaded ${data.count} images`);
+        logToServer('reload_complete', { count: data.count });
         
       } catch (error) {
         console.error('Error reloading images:', error);
@@ -2696,7 +3115,114 @@
     
     // Use embedded image list directly
     (function() {
+      // Initialize UI from settings (must happen before gallery initialization)
+      initializeModelFilters();
+      initializeSizeSlider();
+      initializePaging();
+      
+      // Re-attach model filter button event listeners after generating buttons
+      function attachModelFilterListeners() {
+        const modelFilterBtns = document.querySelectorAll('.model-filter-btn');
+        console.log(`[Model Filter] Found ${modelFilterBtns.length} buttons to attach listeners to`);
+        
+        if (modelFilterBtns.length === 0) {
+          console.error('[Model Filter] No buttons found!');
+          return;
+        }
+        
+        modelFilterBtns.forEach((btn, index) => {
+          // Remove any existing listeners by cloning
+          const newBtn = btn.cloneNode(true);
+          btn.parentNode.replaceChild(newBtn, btn);
+          
+          const model = newBtn.dataset.model;
+          const containsText = newBtn.getAttribute('data-contains');
+          
+          console.log(`[Model Filter] Attaching listener to button ${index}: ${model} (contains: ${containsText})`);
+          
+          newBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            const clickedModel = this.dataset.model;
+            const clickedBtn = this;
+            
+            console.log(`[Model Filter] Button clicked: ${clickedModel}`);
+            debugLog(`[Model Filter] Button clicked: ${clickedModel}`);
+            
+            // Toggle: if already active, deactivate; otherwise activate this one
+            if (activeModelFilter === clickedModel) {
+              activeModelFilter = null;
+              clickedBtn.classList.remove('active');
+              console.log(`[Model Filter] Deactivated ${clickedModel} filter`);
+              debugLog(`[Model Filter] Deactivated ${clickedModel} filter`);
+              logToServer('model_filter', { model: null, action: 'deactivate' });
+              // Re-apply filter immediately when deactivating
+              const searchInput = document.getElementById('searchInput');
+              filterImages(searchInput ? searchInput.value : '');
+            } else {
+              // Deactivate all buttons first
+              document.querySelectorAll('.model-filter-btn').forEach(b => b.classList.remove('active'));
+              // Activate this button
+              activeModelFilter = clickedModel;
+              clickedBtn.classList.add('active');
+              
+              console.log(`[Model Filter] Activating ${clickedModel} filter...`);
+              debugLog(`[Model Filter] Activating ${clickedModel} filter...`);
+              logToServer('model_filter', { model: clickedModel, action: 'activate' });
+              
+              // If metadata is already fetched, apply filter immediately
+              if (allMetadataFetched) {
+                console.log(`[Model Filter] Metadata ready, applying ${clickedModel} filter...`);
+                debugLog(`[Model Filter] Metadata ready, applying ${clickedModel} filter...`);
+                const searchInput = document.getElementById('searchInput');
+                filterImages(searchInput ? searchInput.value : '');
+                console.log(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
+                debugLog(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
+                logToServer('model_filter_result', { model: clickedModel, resultCount: filteredImageFiles.length });
+              } else {
+                // Need to fetch metadata first
+                try {
+                  clickedBtn.classList.add('indexing');
+                  updateModelFilterButtonsState(true, 0);
+                  
+                  console.log(`[Model Filter] Applying ${clickedModel} filter...`);
+                  debugLog(`[Model Filter] Applying ${clickedModel} filter...`);
+                  
+                  await fetchAllImageMetadata(false);
+                  
+                  // Re-apply current search filter (which will also apply model filter)
+                  const searchInput = document.getElementById('searchInput');
+                  filterImages(searchInput ? searchInput.value : '');
+                  
+                  // Log results
+                  console.log(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
+                  debugLog(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
+                  logToServer('model_filter_result', { model: clickedModel, resultCount: filteredImageFiles.length });
+                } catch (err) {
+                  console.error('[Model Filter] Error:', err);
+                } finally {
+                  clickedBtn.classList.remove('indexing');
+                  updateModelFilterButtonsState(false);
+                }
+              }
+            }
+          });
+        });
+        
+        console.log(`[Model Filter] Successfully attached listeners to ${modelFilterBtns.length} buttons`);
+      }
+      
+      // Attach listeners after a brief delay to ensure DOM is ready
+      setTimeout(() => {
+        attachModelFilterListeners();
+      }, 100);
+      
       initializeGallery(embeddedImageList);
+      
+      // Start background metadata indexing for model filters
+      startBackgroundMetadataIndexing();
 
         // Set up pagination arrow handlers
         const paginationPrev = document.getElementById('paginationPrev');
@@ -2721,6 +3247,8 @@
             item.addEventListener('click', function() {
               const newSize = parseInt(this.getAttribute('data-size'));
               if (newSize !== imagesPerPage) {
+                debugLog(`[Page Size] Changed to ${newSize} images per page`);
+                logToServer('page_size_change', { size: newSize });
                 imagesPerPage = newSize;
                 // Update active state in both containers
                 document.querySelectorAll('.pagination-page-size-item').forEach(i => {
@@ -2762,7 +3290,7 @@
         const topNav = document.querySelector('.top-nav');
         const bottomNav = document.getElementById('bottomNav');
         const pageSizeStandalone = document.getElementById('bottomNavPageSizeStandalone');
-        const PROXIMITY_THRESHOLD = 60; // pixels from top/bottom edge (reduced for smaller activation area)
+        const PROXIMITY_THRESHOLD = 45; // pixels from top/bottom edge (reduced for smaller activation area)
         
         let mouseY = -1; // Initialize to -1 so we know it hasn't been set yet
         let showBarsTimeout = null;
@@ -2915,8 +3443,17 @@
         }
         
         searchInput.addEventListener('input', function(e) {
-          filterImages(e.target.value);
+          const query = e.target.value;
           updateClearButton();
+          
+          // Debounce search filtering for better performance
+          if (searchDebounce) {
+            clearTimeout(searchDebounce);
+          }
+          searchDebounce = setTimeout(() => {
+            filterImages(query);
+            searchDebounce = null;
+          }, 150);
         });
         
         // Clear button click handler
@@ -2976,12 +3513,6 @@
             }
           }
         }
-        
-        // Force reflow in same loop to minimize iterations
-        if (wrapper) {
-          void wrapper.offsetHeight; // Force reflow on wrapper
-        }
-        void container.offsetHeight; // Force reflow on container
       });
       
       // Invalidate layout cache on size change
@@ -3032,18 +3563,133 @@
       });
     }
 
-    document.querySelectorAll('.size-circle').forEach((circle, index) => {
-      circle.addEventListener('click', function() {
-        // Remove active class from all circles
-        document.querySelectorAll('.size-circle').forEach(c => c.classList.remove('active'));
-        // Add active class to clicked circle
-        this.classList.add('active');
-        // Update size multiplier
-        currentSizeMultiplier = parseFloat(this.getAttribute('data-size'));
-        // Update all images and relayout
-        updateImageSizes();
+    // Size slider functionality with smooth updates
+    // Initialize from settings - generate model filter buttons
+    function initializeModelFilters() {
+      const modelFiltersContainer = document.getElementById('modelFilters');
+      if (!modelFiltersContainer) return;
+      
+      // Clear existing buttons (except status)
+      const statusEl = modelFiltersContainer.querySelector('.model-filters-status');
+      modelFiltersContainer.innerHTML = '';
+      if (statusEl) {
+        modelFiltersContainer.appendChild(statusEl);
+      }
+      
+      // Generate buttons from settings
+      MODEL_FILTERS.forEach(filter => {
+        const btn = document.createElement('button');
+        btn.className = 'model-filter-btn';
+        btn.setAttribute('data-model', filter.containsText.toLowerCase());
+        btn.setAttribute('data-contains', filter.containsText);
+        btn.textContent = filter.label;
+        modelFiltersContainer.insertBefore(btn, statusEl);
       });
-    });
+    }
+    
+    // Initialize size slider from settings
+    function initializeSizeSlider() {
+      const sizeSlider = document.getElementById('sizeSlider');
+      if (!sizeSlider) return;
+      
+      const minMultiplier = IMAGE_SIZE_SETTINGS.min / IMAGE_SIZE_SETTINGS.min; // Always 1.0
+      const maxMultiplier = IMAGE_SIZE_SETTINGS.max / IMAGE_SIZE_SETTINGS.min;
+      const defaultMultiplier = IMAGE_SIZE_SETTINGS.default / IMAGE_SIZE_SETTINGS.min;
+      
+      sizeSlider.min = minMultiplier.toString();
+      sizeSlider.max = maxMultiplier.toString();
+      sizeSlider.step = IMAGE_SIZE_SETTINGS.step.toString();
+      sizeSlider.value = defaultMultiplier.toString();
+      
+      // Update current multiplier
+      currentSizeMultiplier = defaultMultiplier;
+    }
+    
+    // Initialize paging from settings
+    function initializePaging() {
+      const containers = [
+        document.getElementById('paginationPageSize')?.parentElement,
+        document.getElementById('bottomNavPageSizeStandalone')
+      ].filter(Boolean);
+      
+      containers.forEach(container => {
+        if (!container) return;
+        
+        // Find the page size container
+        const pageSizeContainer = container.querySelector('.bottom-nav-center') || 
+                                  container.querySelector('.pagination-page-size');
+        if (!pageSizeContainer) return;
+        
+        // Clear existing items
+        pageSizeContainer.innerHTML = '';
+        
+        // Generate from settings
+        PAGING_SETTINGS.options.forEach((size, index) => {
+          const item = document.createElement('span');
+          item.className = 'pagination-page-size-item';
+          if (size === PAGING_SETTINGS.default) {
+            item.classList.add('active');
+          }
+          item.setAttribute('data-size', size.toString());
+          item.textContent = size.toString();
+          pageSizeContainer.appendChild(item);
+          
+          // Add separator (except after last item)
+          if (index < PAGING_SETTINGS.options.length - 1) {
+            const separator = document.createElement('span');
+            separator.className = 'pagination-page-size-separator';
+            separator.textContent = '·';
+            pageSizeContainer.appendChild(separator);
+          }
+        });
+      });
+    }
+    
+    // Initialize everything from settings
+    initializeModelFilters();
+    initializeSizeSlider();
+    initializePaging();
+    
+    const sizeSlider = document.getElementById('sizeSlider');
+    let sizeUpdatePending = false;
+    let sizeUpdateRafId = null;
+    
+    if (sizeSlider) {
+      // Smooth size update using requestAnimationFrame
+      function scheduleSizeUpdate() {
+        if (sizeUpdatePending) return;
+        sizeUpdatePending = true;
+        
+        if (sizeUpdateRafId) {
+          cancelAnimationFrame(sizeUpdateRafId);
+        }
+        
+        sizeUpdateRafId = requestAnimationFrame(() => {
+          updateImageSizes();
+          sizeUpdatePending = false;
+          sizeUpdateRafId = null;
+        });
+      }
+      
+      // Handle slider input (real-time updates with throttling)
+      sizeSlider.addEventListener('input', function() {
+        currentSizeMultiplier = parseFloat(this.value);
+        // Schedule smooth update
+        scheduleSizeUpdate();
+      });
+      
+      // Handle slider change (when released)
+      sizeSlider.addEventListener('change', function() {
+        currentSizeMultiplier = parseFloat(this.value);
+        // Ensure final update is applied
+        if (sizeUpdateRafId) {
+          cancelAnimationFrame(sizeUpdateRafId);
+        }
+        updateImageSizes();
+        debugLog(`[Size] Changed to ${currentSizeMultiplier}x (${Math.round(baseColumnWidth * currentSizeMultiplier)}px)`);
+        logToServer('size_change', { multiplier: currentSizeMultiplier, width: Math.round(baseColumnWidth * currentSizeMultiplier) });
+      });
+    }
 
     // Sort functionality
     async function getFileDate(filename) {
@@ -3113,6 +3759,9 @@
         sortState.filename = 'desc';
       }
       
+      debugLog(`[Sort] Sorting by filename: ${sortState.filename}`);
+      logToServer('sort', { by: 'filename', direction: sortState.filename });
+      
       // Optimized sorting: Use Intl.Collator for better performance with numeric sorting
       const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
       const sorted = [...allImageFiles].sort((a, b) => {
@@ -3124,20 +3773,13 @@
       
       allImageFiles = sorted;
       
-      // Update filtered arrays if no active filter
+      // Re-apply all active filters (model, favorites, search) after sorting
       const searchInput = document.getElementById('searchInput');
-      if (!searchInput || searchInput.value.length < 2) {
-        filteredImageFiles = [...allImageFiles];
-      }
+      const searchQuery = searchInput ? searchInput.value : '';
+      filterImages(searchQuery);
       
-      // Invalidate layout cache when sorting
-      layoutCache = null;
-      
-      // Reset to page 1 and update pagination
-      currentPage = 1;
+      // Update sort button icons
       updateSortButtonIcons();
-      updatePaginationUI();
-      loadCurrentPage();
     }
 
     async function sortByDate() {
@@ -3148,6 +3790,9 @@
       } else {
         sortState.date = 'desc';
       }
+      
+      debugLog(`[Sort] Sorting by date: ${sortState.date}`);
+      logToServer('sort', { by: 'date', direction: sortState.date });
       
       updateSortButtonIcons();
       
@@ -3186,19 +3831,13 @@
       
       allImageFiles = newFiles;
       
-      // Update filtered arrays if no active filter
+      // Re-apply all active filters (model, favorites, search) after sorting
       const searchInput = document.getElementById('searchInput');
-      if (!searchInput || searchInput.value.length < 2) {
-        filteredImageFiles = [...allImageFiles];
-      }
+      const searchQuery = searchInput ? searchInput.value : '';
+      filterImages(searchQuery);
       
-      // Invalidate layout cache when sorting
-      layoutCache = null;
-      
-      // Reset to page 1 and update pagination
-      currentPage = 1;
-      updatePaginationUI();
-      loadCurrentPage();
+      // Update sort button icons
+      updateSortButtonIcons();
     }
 
     // Set up sort button handlers
@@ -3210,16 +3849,25 @@
     if (favoritesFilterBtn) {
       favoritesFilterBtn.addEventListener('click', function() {
         showFavoritesOnly = !showFavoritesOnly;
+        debugLog(`[Filter] Favorites filter: ${showFavoritesOnly ? 'on' : 'off'}`);
+        logToServer('favorites_filter', { enabled: showFavoritesOnly });
         if (showFavoritesOnly) {
           this.classList.add('favorites-active');
         } else {
           this.classList.remove('favorites-active');
         }
+        
+        // Clear layout cache and columns to force fresh rebuild
+        layoutCache = null;
+        galleryColumns = [];
+        
         // Re-apply current search filter (which will also apply favorites filter)
         const searchInput = document.getElementById('searchInput');
         filterImages(searchInput ? searchInput.value : '');
       });
     }
+    
+    // Model filter buttons are set up in initialization function above
     
     // Lightbox star button - use capture phase to handle before lightbox click
     const lightboxStarButton = document.getElementById('lightboxStarButton');
@@ -3232,11 +3880,11 @@
         
         const filename = this.dataset.filename;
         if (!filename) {
-          console.warn('Lightbox star button: no filename');
+          if (DEBUG_MODE) console.warn('Lightbox star button: no filename');
           return;
         }
         
-        console.log('Lightbox star clicked for:', filename);
+        debugLog('Lightbox star clicked for:', filename);
         
         // Find the corresponding gallery star button
         const galleryStarButton = document.querySelector(`.star-button[data-filename="${filename}"]`);
@@ -4025,11 +4673,11 @@
     function setupGalleryScrolling() {
       const gallery = document.getElementById('gallery');
       if (!gallery) {
-        console.log('Gallery not found for scrolling setup');
+        debugLog('Gallery not found for scrolling setup');
         return;
       }
       
-      console.log('Setting up gallery scrolling');
+      debugLog('Setting up gallery scrolling');
       
       gallery.addEventListener('mousedown', function(e) {
         // Only handle left clicks
@@ -4040,7 +4688,7 @@
           return;
         }
         
-        console.log('Gallery mousedown - starting scroll');
+        debugLog('Gallery mousedown - starting scroll');
         
         // Start scrolling - works on images and empty space
         galleryScrolling = true;
@@ -4052,7 +4700,7 @@
                                    document.documentElement.scrollTop || 
                                    document.body.scrollTop || 
                                    0;
-        console.log('Starting scroll position:', galleryScrollStartScroll);
+        debugLog('Starting scroll position:', galleryScrollStartScroll);
         gallery.classList.add('scrolling');
         e.preventDefault();
         e.stopPropagation();
@@ -4065,7 +4713,7 @@
         e.stopPropagation();
         
         const deltaY = e.clientY - galleryScrollStartY;
-        console.log('Gallery mousemove, deltaY:', deltaY);
+        debugLog('Gallery mousemove, deltaY:', deltaY);
         
         // Only scroll if mouse moved more than 3 pixels (to avoid accidental scrolling)
         if (Math.abs(deltaY) > 3) {
@@ -4081,7 +4729,7 @@
           );
           const clampedScroll = Math.min(newScroll, maxScroll);
           
-          console.log('Scrolling to:', clampedScroll, 'from:', galleryScrollStartScroll, 'deltaY:', deltaY, 'maxScroll:', maxScroll);
+          debugLog('Scrolling to:', clampedScroll, 'from:', galleryScrollStartScroll, 'deltaY:', deltaY, 'maxScroll:', maxScroll);
           
           // Try multiple scroll methods for compatibility
           window.scrollTo(0, clampedScroll);
