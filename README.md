@@ -12,27 +12,27 @@ A standalone web based image gallery viewer for AI-generated images. Automatical
   <table>
     <tr>
       <td align="center">
-        <img src="visuals/masonry-layout.png" alt="Masonry Layout | Thumbnail Size | Search | Sort" width="400"><br>
+        <img src="samples/masonry-layout.png" alt="Masonry Layout | Thumbnail Size | Search | Sort" width="400"><br>
         <sub><b>Masonry Layout | Thumbnail Size | Search | Sort</b></sub>
       </td>
       <td align="center">
-        <img src="visuals/thumbnail-hover.png" alt="Image Metadata,Copy Prompt, Download Overlay" width="400"><br>
+        <img src="samples/thumbnail-hover.png" alt="Image Metadata,Copy Prompt, Download Overlay" width="400"><br>
         <sub><b>Image Metadata | Copy Prompt, Download, & Open Overlay</b></sub>
       </td>
     </tr>
     <tr>
       <td align="center">
-        <img src="visuals/lightbox-image.png" alt="Lightbox Image | Previous & Next Controls" width="400"><br>
+        <img src="samples/lightbox-image.png" alt="Lightbox Image | Previous & Next Controls" width="400"><br>
         <sub><b>Lightbox Image | Metadata | Previous & Next Controls</b></sub>
       </td>
       <td align="center">
-        <img src="visuals/paging-controls.png" alt="Loading Bar | Paging Controls" width="400"><br>
+        <img src="samples/paging-controls.png" alt="Loading Bar | Paging Controls" width="400"><br>
         <sub><b>Loading Bar | Paging Controls | Page Size</b></sub>
       </td>
     </tr>
     <tr>
       <td align="center" colspan="2">
-        <img src="visuals/image-metadata.png" alt="Image Metadata Table" width="400"><br>
+        <img src="samples/image-metadata.png" alt="Image Metadata Table" width="400"><br>
         <sub><b>Diffusion Generation Parameters | Image Metadata Table</b></sub>
       </td>
     </tr>
