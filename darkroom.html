@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Diffusion Darkroom Gallery</title>
   <link rel="icon" type="image/png" href="darkroom.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -68,6 +71,55 @@
     .gallery.scrolling {
       cursor: none !important;
     }
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .loading-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .loading-screen-content {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .loading-screen-title {
+      font-size: 24px;
+      font-weight: 500;
+      margin-bottom: 10px;
+      font-family: 'Roboto', sans-serif;
+    }
+    .loading-screen-message {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      font-family: 'Roboto', sans-serif;
+    }
+    .loading-screen-progress {
+      width: 300px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    .loading-screen-progress-fill {
+      height: 100%;
+      background: rgba(158, 197, 219, 1);
+      transition: width 0.3s ease;
+      width: 0%;
+    }
     .gallery-column {
       display: inline-block;
       vertical-align: top;
@@ -91,6 +143,8 @@
       border-radius: 5px;
       cursor: pointer;
       break-inside: avoid-column;
+      /* Prevent layout shifts during loading */
+      contain: layout style;
     }
     .img-container.deleted {
       cursor: default;
@@ -133,6 +187,10 @@
       /* Reserve space to prevent layout shift */
       min-height: 200px;
       background: rgba(30, 30, 30, 0.5);
+      /* Prevent layout shifts during image loading */
+      contain: layout style paint;
+      /* Smooth height transitions */
+      transition: min-height 0.2s ease-out;
     }
     .image-wrapper img {
       width: 100%;
@@ -140,15 +198,17 @@
       display: block;
       height: auto;
       border-radius: 4px;
-      background: #fff;
+      background: #2a2a2a;
       border: 1px solid #515151;
       box-shadow: 0 2px 8px rgba(0,0,0,0.18);
       object-fit: contain;
       position: relative;
       z-index: 1;
       opacity: 0;
-      transition: opacity 0.3s ease;
+      transition: opacity 0.2s ease-in;
       will-change: opacity;
+      /* Prevent layout shifts */
+      contain: layout style paint;
     }
     .image-wrapper img.loaded {
       opacity: 1;
@@ -162,6 +222,7 @@
       background: linear-gradient(90deg, rgba(30,30,30,0.5) 0%, rgba(40,40,40,0.5) 50%, rgba(30,30,30,0.5) 100%);
       background-size: 200% 100%;
       animation: shimmer 1.5s infinite;
+      pointer-events: none; /* Allow clicks to pass through to image/container */
       border-radius: 4px;
       z-index: 0;
     }
@@ -193,9 +254,10 @@
     }
     .image-buttons {
       position: absolute;
-      top: 12px;
+      top: 7px;
       left: 7px;
       display: flex;
+      flex-direction: column;
       gap: 4px;
       z-index: 3;
       opacity: 0;
@@ -237,9 +299,9 @@
     .image-button::after {
       content: attr(data-label);
       position: absolute;
-      bottom: calc(100% + 5px);
-      left: 50%;
-      transform: translateX(-50%);
+      top: 50%;
+      left: calc(100% + 8px);
+      transform: translateY(-50%);
       padding: 4px 8px;
       background: rgba(0, 0, 0, 0.85);
       color: #fff;
@@ -251,6 +313,7 @@
       transition: opacity 0.2s;
       font-family: 'Roboto', sans-serif;
       z-index: 10;
+      min-width: max-content;
     }
     .image-button:hover::after {
       opacity: 1;
@@ -298,6 +361,28 @@
       fill: #fff;
       transition: fill 0.2s;
     }
+    .star-button::after {
+      content: attr(data-label);
+      position: absolute;
+      top: 50%;
+      right: calc(100% + 8px);
+      transform: translateY(-50%);
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 11px;
+      white-space: nowrap;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      font-family: 'Roboto', sans-serif;
+      z-index: 10;
+      min-width: max-content;
+    }
+    .star-button:hover::after {
+      opacity: 1;
+    }
     .delete-button {
       position: absolute;
       top: 38px;
@@ -334,6 +419,28 @@
       fill: #fff;
       transition: fill 0.2s;
     }
+    .delete-button::after {
+      content: attr(data-label);
+      position: absolute;
+      top: 50%;
+      right: calc(100% + 8px);
+      transform: translateY(-50%);
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 11px;
+      white-space: nowrap;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      font-family: 'Roboto', sans-serif;
+      z-index: 10;
+      min-width: max-content;
+    }
+    .delete-button:hover::after {
+      opacity: 1;
+    }
     /* ---- Lightbox ---- */
     .lightbox-overlay {
       display: none;
@@ -368,7 +475,7 @@
       width: auto;
       height: auto;
       border-radius: 5px;
-      background: #fff;
+      background: #2a2a2a;
       border: 1px solid #fff;
       object-fit: contain;
       box-shadow: 0 2px 32px #000;
@@ -615,7 +722,7 @@
     }
     .image-count {
       color: rgba(255, 255, 255, 0.7);
-      font-size: 11px;
+      font-size: 13px;
       font-family: 'Roboto', sans-serif;
       pointer-events: none;
       white-space: nowrap;
@@ -739,24 +846,7 @@
       opacity: 0.6;
       cursor: wait;
     }
-    .model-filter-btn.indexing {
-      position: relative;
-      overflow: hidden;
-    }
-    .model-filter-btn.indexing::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 2px;
-      background: #6a6;
-      animation: indexing-progress 2s ease-in-out infinite;
-    }
-    @keyframes indexing-progress {
-      0% { width: 0%; left: 0; }
-      50% { width: 100%; left: 0; }
-      100% { width: 0%; left: 100%; }
-    }
+    /* Model filter button indexing animation removed - status shown in bottom left progress indicator */
     .model-filters-status {
       font-size: 10px;
       color: #666;
@@ -916,7 +1006,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 11px;
+      font-size: 13px;
       font-family: 'Roboto', sans-serif;
       color: rgba(255, 255, 255, 0.7);
     }
@@ -937,7 +1027,7 @@
       width: 0%;
     }
     .loading-percentage {
-      font-size: 11px;
+      font-size: 13px;
       color: rgba(255, 255, 255, 0.7);
       white-space: nowrap;
     }
@@ -979,6 +1069,28 @@
       align-items: center;
       gap: 12px;
       flex-shrink: 0;
+    }
+    .processing-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #ff4444;
+      flex-shrink: 0;
+      display: none;
+    }
+    .processing-indicator.active {
+      display: block;
+    }
+    .processing-status {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      font-family: 'Roboto', sans-serif;
+      white-space: nowrap;
+      min-height: 16px;
+      line-height: 16px;
+    }
+    .processing-status.active {
+      color: rgba(158, 197, 219, 1);
     }
     .bottom-nav-center {
       display: flex;
@@ -1170,15 +1282,26 @@
       </button>
     </div>
   </div>
+  <div class="loading-screen" id="loadingScreen">
+    <div class="loading-screen-content">
+      <div class="loading-screen-title">Loading Darkroom</div>
+      <div class="loading-screen-message" id="loadingScreenMessage">Preparing Layout...</div>
+      <div class="loading-screen-progress">
+        <div class="loading-screen-progress-fill" id="loadingScreenProgress"></div>
+      </div>
+    </div>
+  </div>
   <div class="gallery" id="gallery"></div>
   <div class="bottom-nav hidden" id="bottomNav">
     <div class="bottom-nav-left">
+      <div class="processing-indicator" id="processingIndicator"></div>
       <div class="loading-bar-container" id="loadingBarContainer">
         <div class="loading-bar-wrapper">
           <div class="loading-bar-fill" id="loadingBarFill"></div>
         </div>
         <div class="loading-percentage" id="loadingPercentage">0%</div>
       </div>
+      <div class="processing-status" id="processingStatus"></div>
       <div class="image-count" id="imageCount" style="display: none;">Total Images: <span class="count-number">0</span></div>
     </div>
     <div class="bottom-nav-center">
@@ -1245,7 +1368,7 @@
   </div>
   <script>
     // Production debug flag - set to false to disable debug logging
-    const DEBUG_MODE = false;
+    const DEBUG_MODE = false; // Set to true for debugging
     
     // Debug logging helper
     function debugLog(...args) {
@@ -1632,15 +1755,55 @@
       }).catch(() => {}); // Ignore errors for logging
     }
     
-    // Update model filter buttons to show indexing state
+    // Unified progress status management
+    let currentProcessingState = null;
+    let processingStatusQueue = [];
+    
+    function updateProcessingStatus(message, isActive = false) {
+      const statusEl = document.getElementById('processingStatus');
+      const indicatorEl = document.getElementById('processingIndicator');
+      const bottomNav = document.getElementById('bottomNav');
+      if (!statusEl || !indicatorEl || !bottomNav) return;
+      
+      // Update status text and indicator
+      if (message && isActive) {
+        statusEl.textContent = message;
+        statusEl.classList.add('active');
+        indicatorEl.classList.add('active');
+        bottomNav.classList.remove('hidden'); // Ensure bottom nav is available
+      } else if (message) {
+        statusEl.textContent = message;
+        statusEl.classList.remove('active');
+        indicatorEl.classList.remove('active');
+        bottomNav.classList.remove('hidden');
+      } else {
+        statusEl.textContent = '';
+        statusEl.classList.remove('active');
+        indicatorEl.classList.remove('active');
+        // Don't add 'hidden' - let updateBarsVisibility control visibility
+      }
+      
+      // Update bar visibility based on current state
+      if (typeof window.updateBarsVisibility === 'function') {
+        window.updateBarsVisibility();
+      }
+    }
+    
+    function clearProcessingStatus() {
+      // Simply clear status - updateBarsVisibility will handle hiding bars
+      updateProcessingStatus('');
+    }
+    
+    // Update model filter buttons to show indexing state (simplified - no animation)
     function updateModelFilterButtonsState(isIndexing, progress = null) {
       const btns = document.querySelectorAll('.model-filter-btn');
       const statusEl = document.querySelector('.model-filters-status');
       
       if (isIndexing) {
         btns.forEach(btn => btn.classList.add('indexing'));
-        if (statusEl && progress !== null) {
-          statusEl.textContent = `Loading Metadata: ${progress}%`;
+        // Status now shown in bottom left progress indicator
+        if (statusEl) {
+          statusEl.textContent = '';
         }
       } else {
         btns.forEach(btn => btn.classList.remove('indexing'));
@@ -1684,6 +1847,9 @@
         
         // Show indexing state
         updateModelFilterButtonsState(true, 0);
+        if (!isBackground) {
+          updateProcessingStatus('Loading metadata...', true);
+        }
         
         // Fetch metadata in batches to avoid overwhelming the browser
         const BATCH_SIZE = isBackground ? 10 : 20; // Smaller batches for background
@@ -1723,9 +1889,29 @@
             }
           });
           
-          // Update progress
+          // Update progress - use the same loading bar as image loading
           const progressPct = Math.round(((i + batch.length) / total) * 100);
           updateModelFilterButtonsState(true, progressPct);
+          
+          // Update loading bar for metadata processing
+          const loadingBarFill = document.getElementById('loadingBarFill');
+          const loadingBarContainer = document.getElementById('loadingBarContainer');
+          const loadingPercentage = document.getElementById('loadingPercentage');
+          if (loadingBarFill && loadingBarContainer) {
+            loadingBarFill.style.width = progressPct + '%';
+            loadingBarContainer.classList.remove('hidden');
+            // Hide the percentage text during metadata processing (same as image loading)
+            if (loadingPercentage) {
+              loadingPercentage.style.display = 'none';
+            }
+          }
+          
+          if (!isBackground) {
+            updateProcessingStatus(`Processing Metadata: ${progressPct}%`, true);
+          } else if (i === 0 || (i + BATCH_SIZE) % 50 === 0 || i + BATCH_SIZE >= total) {
+            // Show background progress less frequently
+            updateProcessingStatus(`Processing Metadata: ${progressPct}%`, true);
+          }
           
           if ((i + BATCH_SIZE) % 100 === 0 || i + BATCH_SIZE >= total) {
             debugLog(`[Model Filter] Processed ${Math.min(i + BATCH_SIZE, total)}/${total} (${errors} errors)`);
@@ -1739,6 +1925,37 @@
         
         allMetadataFetched = true;
         updateModelFilterButtonsState(false);
+        
+        // Hide loading bar when metadata processing is complete (always hide, regardless of background)
+        const loadingBarContainer = document.getElementById('loadingBarContainer');
+        const loadingPercentage = document.getElementById('loadingPercentage');
+        if (loadingBarContainer) {
+          loadingBarContainer.classList.add('hidden');
+          // Restore percentage display for future use
+          if (loadingPercentage) {
+            loadingPercentage.style.display = '';
+            loadingPercentage.textContent = '0%';
+          }
+        }
+        
+        if (!isBackground) {
+          // Clear status - updateBarsVisibility will handle bar visibility
+          updateProcessingStatus('', false);
+          // Ensure bars are updated after a brief delay to ensure all state is cleared
+          setTimeout(() => {
+            if (typeof window.updateBarsVisibility === 'function') {
+              window.updateBarsVisibility();
+            }
+          }, 50);
+        } else {
+          clearProcessingStatus();
+          // Ensure bars are updated after background processing completes
+          setTimeout(() => {
+            if (typeof window.updateBarsVisibility === 'function') {
+              window.updateBarsVisibility();
+            }
+          }, 50);
+        }
         debugLog(`[Model Filter] Complete: ${processed} indexed, ${errors} errors`);
         logToServer('metadata_fetch_complete', { indexed: processed, errors, background: isBackground });
         
@@ -1798,7 +2015,8 @@
           resolve(dims);
         };
         img.onerror = () => {
-          // Default dimensions if can't load
+          // Default dimensions if can't load (file doesn't exist - 404 is expected for missing files)
+          // Silently handle - don't log errors for missing files as this is normal
           const dims = { width: 600, height: 600 };
           imageDimensionsCache.set(filename, dims);
           resolve(dims);
@@ -1971,10 +2189,10 @@
           // Update the star button state immediately
           if (isCurrentlyFavorited) {
             starButton.classList.remove('favorited');
-            starButton.setAttribute('data-label', 'Add to favorites');
+            starButton.setAttribute('data-label', 'Add to Favorites');
           } else {
             starButton.classList.add('favorited');
-            starButton.setAttribute('data-label', 'Remove from favorites');
+            starButton.setAttribute('data-label', 'Remove from Favorites');
           }
           
           // Also update lightbox star button if it exists and shows the same file
@@ -2001,16 +2219,64 @@
             filteredImageFiles[filteredIndex] = newPath;
           }
           
-          // Update container dataset - DO NOT update image src to avoid reload/flash/scroll
-          // The file is moved on the server, but the image content is identical
-          // The browser already has the image loaded, so we don't need to change the src
+          // Update all filename references in the UI
           starButton.dataset.filename = newPath;
           const container = starButton.closest('.img-container');
           if (container) {
             container.dataset.filename = newPath;
-            // DO NOT update img.src - this causes reload, white flash, and scroll issues
-            // The image is already loaded and displayed correctly
-            // Only update data attributes for future reference
+            
+            // Store the current filename in container for reference
+            container.dataset.currentFilename = newPath;
+            
+            // Update img.src to new path so download/open work correctly
+            // The file was moved on the server, so we need to update the URL
+            const img = container.querySelector('.image-wrapper img');
+            if (img) {
+              // Update src to new path - browser will use cached version if available
+              const newImageUrl = escapeFilename(newPath);
+              // Only update if different to avoid unnecessary changes
+              if (img.src !== newImageUrl && !img.src.includes(newPath)) {
+                img.src = newImageUrl;
+              }
+            }
+            
+            // Update download button - replace click handler to use new path
+            const downloadBtn = container.querySelector('.image-button[data-label="Download"]');
+            if (downloadBtn) {
+              // Remove old listener and add new one
+              const newDownloadHandler = function(e) {
+                e.stopPropagation();
+                const a = document.createElement('a');
+                a.href = escapeFilename(newPath);
+                a.download = getFilenameOnly(newPath);
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              };
+              // Clone button to remove old listeners, then re-add
+              const newDownloadBtn = downloadBtn.cloneNode(true);
+              newDownloadBtn.addEventListener('click', newDownloadHandler);
+              downloadBtn.parentNode.replaceChild(newDownloadBtn, downloadBtn);
+            }
+            
+            // Update open button - replace click handler to use new path
+            const openButton = container.querySelector('.image-button[data-label="Open"]');
+            if (openButton) {
+              const newOpenHandler = function(e) {
+                e.stopPropagation();
+                window.open(escapeFilename(newPath), '_blank');
+              };
+              // Clone button to remove old listeners, then re-add
+              const newOpenBtn = openButton.cloneNode(true);
+              newOpenBtn.addEventListener('click', newOpenHandler);
+              openButton.parentNode.replaceChild(newOpenBtn, openButton);
+            }
+            
+            // Update delete button filename reference
+            const deleteButton = container.querySelector('.delete-button');
+            if (deleteButton) {
+              deleteButton.dataset.filename = newPath;
+            }
           }
           
           // Update lightbox image if it's showing this file
@@ -2048,11 +2314,17 @@
     
     // Delete image function
     async function deleteImage(filename, container) {
+      // Preserve scroll position
+      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+      
       // Show confirmation dialog
       const confirmed = confirm(`Are you sure you want to delete this image?\n\n${filename}\n\nThis action cannot be undone.`);
       if (!confirmed) {
         return;
       }
+      
+      // Show processing status
+      updateProcessingStatus('Deleting image...', true);
       
       try {
         // Normalize the filename path
@@ -2122,6 +2394,14 @@
           }
           
           logToServer('image_deleted', { filename });
+          
+          // Restore scroll position after delete
+          requestAnimationFrame(() => {
+            window.scrollTo(0, scrollY);
+            document.documentElement.scrollTop = scrollY;
+            document.body.scrollTop = scrollY;
+            clearProcessingStatus();
+          });
         } else {
           // Revert visual state on error
           container.classList.remove('deleted');
@@ -2137,6 +2417,7 @@
           }
           console.error('Failed to delete file:', errorMessage);
           alert('Failed to delete image: ' + errorMessage);
+          clearProcessingStatus();
         }
       } catch (error) {
         // Revert visual state on error
@@ -2184,6 +2465,18 @@
       }
       // Update cache with new layout key and container reference
       layoutCache = { key: layoutKey, containers: allImageContainers };
+      
+      // DON'T preserve scroll during layout - layout happens before user sees anything
+      // Only preserve scroll if user is already viewing the page (not initial load)
+      const shouldPreserveScroll = initialPageLoaded;
+      let scrollY = 0;
+      let scrollX = 0;
+      
+      if (shouldPreserveScroll) {
+        // Capture scroll position before layout changes
+        scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+        scrollX = window.scrollX || window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0;
+      }
       
       // Clear existing columns but preserve containers
       // Remove containers from columns first to avoid DOM issues
@@ -2262,6 +2555,23 @@
         // Ensure column element doesn't have a fixed height that would prevent shrinking
         shortestColumn.element.style.height = 'auto';
       }
+      
+      // RESTORE SCROLL POSITION after layout is complete (only if preserving)
+      if (shouldPreserveScroll && scrollY > 0) {
+        // Restore scroll position after layout completes
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            // Restore to captured position
+            window.scrollTo(scrollX, scrollY);
+            if (document.documentElement.scrollTop !== undefined) {
+              document.documentElement.scrollTop = scrollY;
+            }
+            if (document.body.scrollTop !== undefined) {
+              document.body.scrollTop = scrollY;
+            }
+          });
+        });
+      }
     }
 
     function updateImageCount() {
@@ -2338,7 +2648,7 @@
       }
     }
     
-    function goToPage(page) {
+    function goToPage(page, preserveScroll = false) {
       const totalPages = getTotalPages();
       if (page < 1 || page > totalPages) return;
       
@@ -2348,21 +2658,31 @@
       // Invalidate layout cache when changing pages
       layoutCache = null;
       
-      // Scroll to top immediately before any content changes
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      // Only scroll to top if not preserving scroll position (e.g., explicit page navigation)
+      // Use requestAnimationFrame to prevent scroll jumps during layout
+      if (!preserveScroll) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        });
+      }
       
       currentPage = page;
       updatePaginationUI();
-      loadCurrentPage();
+      loadCurrentPage(preserveScroll);
       
-      // Scroll again after a brief delay to ensure it sticks
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      }, 10);
+      // Scroll again after layout completes (only if not preserving)
+      // Don't scroll immediately - let layout complete first
+      if (!preserveScroll) {
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+          });
+        }, 100); // Wait for layout to start
+      }
     }
     
     function goToPreviousPage() {
@@ -2427,21 +2747,32 @@
         const percentage = totalPageImages > 0 ? Math.round((total / totalPageImages) * 100) : 0;
         
         loadingBarFill.style.width = percentage + '%';
-        loadingPercentage.textContent = percentage + '%';
+        // Hide the percentage text and use processing status instead to avoid duplication
+        if (loadingPercentage) {
+          loadingPercentage.style.display = 'none';
+        }
+        updateProcessingStatus(`Loading Images ${total} of ${totalPageImages}`, true);
         
-        // Hide loading bar and show image count when all images are loaded
-        if (total >= totalPageImages && totalPageImages > 0) {
-          setTimeout(() => {
-            if (loadingBarContainer) {
-              loadingBarContainer.classList.add('hidden');
-            }
-            // Update bars after loading completes
-            if (typeof window.updateBarsVisibility === 'function') {
-              window.updateBarsVisibility();
-            }
-            if (imageCountEl) {
-              imageCountEl.style.display = '';
-            }
+            // Hide loading bar and show image count when all images are loaded
+            if (total >= totalPageImages && totalPageImages > 0) {
+              setTimeout(() => {
+                if (loadingBarContainer) {
+                  loadingBarContainer.classList.add('hidden');
+                }
+                // Restore percentage display for future use
+                if (loadingPercentage) {
+                  loadingPercentage.style.display = '';
+                  loadingPercentage.textContent = '0%';
+                }
+                if (imageCountEl) {
+                  imageCountEl.style.display = '';
+                }
+                // Clear processing status FIRST - this will clear the indicator
+                clearProcessingStatus();
+                // THEN update bars visibility - this ensures loading bar is hidden and status is cleared
+                if (typeof window.updateBarsVisibility === 'function') {
+                  window.updateBarsVisibility();
+                }
             
             // Final layout recalculation after all images are loaded
             // Use a debounced call to avoid conflicts
@@ -2450,16 +2781,35 @@
             }
             clearTimeout(window.finalLayoutTimeout);
             // Invalidate cache before final layout to ensure fresh calculation
+            // Use requestIdleCallback to avoid blocking scroll during layout
+            // Longer delay to batch more image loads and reduce jumpiness
             layoutCache = null;
             window.finalLayoutTimeout = setTimeout(() => {
-              layoutMasonry();
-              
-              // Start background metadata indexing after first page loads
-              if (!initialPageLoaded) {
-                initialPageLoaded = true;
-                triggerBackgroundMetadataIndexing();
+              if (window.requestIdleCallback) {
+                window.requestIdleCallback(() => {
+                  layoutMasonry();
+                  
+                  // Start background metadata indexing after first page loads
+                  if (!initialPageLoaded) {
+                    initialPageLoaded = true;
+                    triggerBackgroundMetadataIndexing();
+                  }
+                }, { timeout: 2000 }); // Longer timeout to batch more updates
+              } else {
+                // Fallback: use longer delay to batch updates
+                setTimeout(() => {
+                  requestAnimationFrame(() => {
+                    layoutMasonry();
+                    
+                    // Start background metadata indexing after first page loads
+                    if (!initialPageLoaded) {
+                      initialPageLoaded = true;
+                      triggerBackgroundMetadataIndexing();
+                    }
+                  });
+                }, 300); // Delay to batch updates
               }
-            }, 200);
+            }, 500); // Increased from 200ms to 500ms to reduce jumpiness
           }, 300);
         }
       }
@@ -2502,40 +2852,75 @@
         return;
       }
       
-      // No intersection observer needed - we load all images immediately
+      // PHASE 1: Load ALL dimensions first, then create complete layout
+      const loadingScreen = document.getElementById('loadingScreen');
+      const loadingScreenMessage = document.getElementById('loadingScreenMessage');
+      const loadingScreenProgress = document.getElementById('loadingScreenProgress');
+      const isInitialLoad = !initialPageLoaded;
+      
+      if (isInitialLoad) {
+        // Show loading screen for initial load only
+        if (loadingScreen) {
+          loadingScreen.classList.remove('hidden');
+        }
+        if (loadingScreenMessage) {
+          loadingScreenMessage.textContent = 'Loading image dimensions...';
+        }
+        if (loadingScreenProgress) {
+          loadingScreenProgress.style.width = '0%';
+        }
+      }
       
       const maxWidth = baseColumnWidth * currentSizeMultiplier;
       
-      // Create containers immediately (don't wait for dimensions)
-      // This allows visible images to show right away
-      pageFiles.forEach((filename, pageIndex) => {
-        // Create new container for this image
-        const container = document.createElement('div');
-        container.className = 'img-container';
-        container.dataset.filename = filename; // Store filename for intersection observer
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'image-wrapper';
-        wrapper.style.maxWidth = maxWidth + 'px';
-        
-        // Use default placeholder height initially (will be updated when dimensions load)
-        wrapper.style.minHeight = '200px';
-        
-        // Add placeholder shimmer
-        const placeholder = document.createElement('div');
-        placeholder.className = 'image-placeholder';
-        wrapper.appendChild(placeholder);
-        
-        // Fetch dimensions in background and update placeholder height
+      // Load ALL dimensions first (PHASE 1)
+      const dimensionPromises = pageFiles.map((filename, index) => 
         getImageDimensions(filename).then(dims => {
-          const placeholderHeight = calculatePlaceholderHeight(dims, maxWidth);
-          wrapper.style.minHeight = placeholderHeight + 'px';
+          // Update progress for initial load
+          if (loadingScreenProgress && isInitialLoad) {
+            loadingScreenProgress.style.width = Math.round(((index + 1) / pageFiles.length) * 50) + '%';
+          }
+          return { filename, dims };
         }).catch(() => {
-          // Keep default height on error
-        });
+          return { filename, dims: null };
+        })
+      );
+      
+      Promise.all(dimensionPromises).then(results => {
+        // Update loading progress
+        if (loadingScreenProgress && isInitialLoad) {
+          loadingScreenProgress.style.width = '50%';
+        }
+        if (loadingScreenMessage && isInitialLoad) {
+          loadingScreenMessage.textContent = 'Creating layout...';
+        }
+        
+        // Now create all containers with CORRECT placeholder sizes (PHASE 1)
+        const containerData = [];
+        results.forEach(({ filename, dims }, pageIndex) => {
+          // Create new container for this image
+          const container = document.createElement('div');
+          container.className = 'img-container';
+          container.dataset.filename = filename;
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'image-wrapper';
+          wrapper.style.maxWidth = maxWidth + 'px';
+          
+          // Calculate CORRECT placeholder height from dimensions (no more updates needed)
+          const placeholderHeight = dims ? calculatePlaceholderHeight(dims, maxWidth) : 200;
+          wrapper.style.minHeight = placeholderHeight + 'px';
+          wrapper.dataset.hasDimensions = 'true';
+          wrapper.dataset.layoutComplete = 'true'; // Mark that layout is complete
+          
+          // Add placeholder shimmer
+          const placeholder = document.createElement('div');
+          placeholder.className = 'image-placeholder';
+          wrapper.appendChild(placeholder);
 
         const img = document.createElement('img');
         img.style.maxWidth = maxWidth + 'px';
+        img.style.opacity = '0'; // Start hidden, will fade in when loaded
         img.decoding = 'async';
         // No lazy loading - we load all images immediately with priority
         
@@ -2561,31 +2946,40 @@
           pageImagesLoaded++;
           updatePageLoadingProgress();
           
-          // Remove placeholder and show image
+          // Smoothly transition from placeholder to image
+          // CSS already handles opacity transition, just add loaded class
+          // Remove placeholder with fade out
           if (placeholder.parentNode) {
-            placeholder.parentNode.removeChild(placeholder);
+            placeholder.style.opacity = '0';
+            placeholder.style.transition = 'opacity 0.15s ease-out';
+            setTimeout(() => {
+              if (placeholder.parentNode) {
+                placeholder.parentNode.removeChild(placeholder);
+              }
+            }, 150);
           }
+          
+          // Fade in image using CSS transition (already defined)
+          // Explicitly set opacity to 1 to ensure image shows
+          img.style.opacity = '1';
           img.classList.add('loaded');
           
-          // Update wrapper height to actual image height
+          // NO LAYOUT CHANGES - layout is already complete
+          // Just update wrapper height to match actual image (should be same as placeholder)
           if (img.naturalHeight && img.naturalWidth) {
             const aspectRatio = img.naturalHeight / img.naturalWidth;
-            wrapper.style.minHeight = (maxWidth * aspectRatio) + 'px';
-            
-            // Debounced layout recalculation as images load
-            // This ensures the masonry grid updates smoothly
-            if (!window.imageLoadLayoutTimeout) {
-              window.imageLoadLayoutTimeout = null;
+            const actualHeight = maxWidth * aspectRatio;
+            // Only update if significantly different (shouldn't happen if dimensions were correct)
+            const currentHeight = parseFloat(wrapper.style.minHeight) || 0;
+            if (Math.abs(currentHeight - actualHeight) > 5) {
+              wrapper.style.minHeight = actualHeight + 'px';
             }
-            clearTimeout(window.imageLoadLayoutTimeout);
-            window.imageLoadLayoutTimeout = setTimeout(() => {
-              layoutCache = null;
-              layoutMasonry();
-            }, 50);
+            wrapper.dataset.loaded = 'true';
           }
           
+          // Queue metadata extraction (but don't process until all images loaded)
           metadataQueue.push({ img, label, baseFilename, copyPromptBtn, container, filename });
-          processMetadataQueue();
+          // Don't call processMetadataQueue() here - wait until all images are loaded
         };
         
         const handleImageError = function() {
@@ -2662,35 +3056,13 @@
         buttonContainer.appendChild(downloadBtn);
         buttonContainer.appendChild(openButton);
 
-        // Load ALL images immediately - no lazy loading
-        // Priority: Load first 30 images first, then rest in batches
-        const imageUrl = escapeFilename(filename);
+        // Set up load and error handlers (images will load AFTER layout is complete)
+        // Store handlers for later attachment
+        img.dataset.handleLoad = 'true';
+        img.dataset.handleError = 'true';
         
-        // Always set up load and error handlers first
-        img.addEventListener('load', handleImageLoad, { once: true });
-        img.addEventListener('error', handleImageError, { once: true });
-        
-        // Load images with priority: first 30 immediately, rest in small delays
-        if (pageIndex < 30) {
-          // Top images load immediately
-          img.src = imageUrl;
-        } else {
-          // Load rest of images with small staggered delays to prioritize visible ones
-          // This allows browser to prioritize the first 30 while still loading all
-          setTimeout(() => {
-            img.src = imageUrl;
-          }, (pageIndex - 30) * 10); // 10ms delay between each image after first 30
-        }
-        
-        // Check if image is already loaded (for cached images)
-        setTimeout(() => {
-          if (img.complete && img.naturalWidth > 0) {
-            // Image already loaded (cached) - show immediately
-            img.removeEventListener('load', handleImageLoad);
-            img.removeEventListener('error', handleImageError);
-            handleImageLoad();
-          }
-        }, 0);
+        // DO NOT set img.src here - will be set after layout is complete (PHASE 2)
+        // DO NOT attach event listeners here - will be attached when src is set
         
         // Add a timeout fallback only for truly stuck images (60 seconds)
         loadTimeoutId = setTimeout(() => {
@@ -2713,7 +3085,7 @@
         // Create star button (upper right corner)
         const starButton = document.createElement('button');
         starButton.className = 'star-button';
-        starButton.setAttribute('data-label', 'Add to favorites');
+        starButton.setAttribute('data-label', 'Add to Favorites');
         starButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
         starButton.dataset.filename = filename;
         
@@ -2724,7 +3096,7 @@
                            filename.includes('\\Favorites\\');
         if (isFavorited) {
           starButton.classList.add('favorited');
-          starButton.setAttribute('data-label', 'Remove from favorites');
+          starButton.setAttribute('data-label', 'Remove from Favorites');
         }
         
         starButton.addEventListener('click', function(e) {
@@ -2740,7 +3112,7 @@
         // Create delete button (underneath star button)
         const deleteButton = document.createElement('button');
         deleteButton.className = 'delete-button';
-        deleteButton.setAttribute('data-label', 'Delete image');
+        deleteButton.setAttribute('data-label', 'Delete');
         deleteButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
         deleteButton.dataset.filename = filename;
         
@@ -2759,37 +3131,243 @@
         wrapper.appendChild(deleteButton);
         container.appendChild(wrapper);
 
-        container.addEventListener('click', function(e) {
-          const index = startIndex + pageIndex; // Index in filteredImageFiles
-          showLightbox(img.src || img.dataset.src, filename, index);
-          e.stopPropagation();
-        });
+        // Attach click handler to container, wrapper, and img to ensure clicks work
+        // Attach click handler to container, wrapper, and img to ensure clicks work
+        // Capture pageIndex and startIndex in closure to avoid scope issues
+        const openLightbox = (function(capturedPageIndex, capturedStartIndex, capturedFilename) {
+          return function(e) {
+            // Don't open lightbox if clicking on buttons
+            if (e.target.closest('.image-button, .star-button, .delete-button, .image-buttons')) {
+              return;
+            }
+            // Don't open if clicking on label
+            if (e.target.classList.contains('filename-label')) {
+              return;
+            }
+            // Don't open if we just scrolled (gallery drag-scroll)
+            if (window.galleryHasScrolled) {
+              return;
+            }
+            // Get current filename from container (may have been updated if file was moved)
+            const currentContainer = e.target.closest('.img-container');
+            const currentFilename = currentContainer?.dataset.filename || currentContainer?.dataset.currentFilename || capturedFilename;
+            const index = capturedStartIndex + capturedPageIndex; // Index in filteredImageFiles
+            // Use current filename to construct URL - this ensures moved files work correctly
+            const imageUrl = escapeFilename(currentFilename);
+            showLightbox(imageUrl, currentFilename, index);
+            e.stopPropagation();
+          };
+        })(pageIndex, startIndex, filename);
+        
+        // Attach to all three elements to ensure clicks work regardless of what's clicked
+        container.addEventListener('click', openLightbox);
+        wrapper.addEventListener('click', openLightbox);
+        img.addEventListener('click', openLightbox);
 
-        // Add to containers array immediately
-        allImageContainers.push(container);
-      });
-      
-      // Re-add deleted containers after new containers (they'll be positioned by masonry)
-      // Note: deletedContainers was preserved before clearing gallery at the start of this function
-      deletedContainers.forEach(deletedContainer => {
-        allImageContainers.push(deletedContainer);
-      });
-      
-      // Layout masonry immediately with containers (don't wait for dimensions)
-      // This allows visible images to show right away
-      // Invalidate cache to force fresh layout when new containers are created
-      layoutCache = null;
-      requestAnimationFrame(() => {
+          // Store container data for later (including handlers)
+          containerData.push({ container, img, placeholder, filename, copyPromptBtn, label, baseFilename, handleImageLoad, handleImageError });
+        });
+        
+        // Re-add deleted containers
+        deletedContainers.forEach(deletedContainer => {
+          containerData.push({ container: deletedContainer });
+        });
+        
+        // PHASE 1 COMPLETE: All containers created with correct sizes
+        // Now do ONE layout calculation - this is the ONLY layout call
+        allImageContainers = containerData.map(d => d.container);
+        layoutCache = null;
         layoutMasonry();
+        
+        // Update progress
+        if (loadingScreenProgress && isInitialLoad) {
+          loadingScreenProgress.style.width = '100%';
+        }
+        if (loadingScreenMessage && isInitialLoad) {
+          loadingScreenMessage.textContent = 'Ready!';
+        }
+        
+        // PHASE 2: Wait for layout to complete, then load images
+        // Use requestAnimationFrame to ensure DOM is fully updated
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            // Now containers are definitely in DOM - start loading images
+            // Track when all images are loaded to trigger metadata
+            let imagesLoadedCount = 0;
+            let imagesErroredCount = 0;
+            const totalImagesToLoad = containerData.filter(d => d.img && d.filename).length;
+            
+            const checkAllImagesLoaded = () => {
+              if (imagesLoadedCount + imagesErroredCount >= totalImagesToLoad && totalImagesToLoad > 0) {
+                // All images loaded - NOW start metadata processing
+                processMetadataQueue();
+                
+                // Start background metadata indexing after ALL images are loaded
+                if (isInitialLoad) {
+                  triggerBackgroundMetadataIndexing();
+                }
+              }
+            };
+            
+            containerData.forEach(({ img, filename, placeholder, handleImageLoad, handleImageError }) => {
+          if (img && filename) {
+            const imageUrl = escapeFilename(filename);
+            
+            // Create a unified load handler that does everything
+            const unifiedLoadHandler = () => {
+              if (img.classList && img.classList.contains('loaded')) return; // Already handled
+              
+              if (DEBUG_MODE) console.log('Image loaded:', filename, 'naturalWidth:', img.naturalWidth, 'naturalHeight:', img.naturalHeight);
+              
+              // Call original handler if it exists (this will clear the timeout)
+              if (handleImageLoad) {
+                try {
+                  handleImageLoad();
+                } catch (e) {
+                  console.error('Error in handleImageLoad for', filename, ':', e);
+                }
+              }
+              
+              // Remove placeholder
+              if (placeholder && placeholder.parentNode) {
+                placeholder.style.opacity = '0';
+                setTimeout(() => {
+                  if (placeholder.parentNode) {
+                    placeholder.parentNode.removeChild(placeholder);
+                  }
+                }, 150);
+              }
+              
+              // Show image - CRITICAL: must set opacity to 1
+              if (img.classList) {
+                img.classList.add('loaded');
+              }
+              img.style.opacity = '1';
+              if (DEBUG_MODE) console.log('Image should now be visible:', filename, 'opacity:', img.style.opacity, 'has loaded class:', img.classList?.contains('loaded'));
+              
+              // Track loading
+              imagesLoadedCount++;
+              checkAllImagesLoaded();
+            };
+            
+            // Create unified error handler
+            const unifiedErrorHandler = () => {
+              if (img.classList && img.classList.contains('loaded')) return; // Already handled
+              
+              if (DEBUG_MODE) console.error('Image failed to load:', filename, 'src:', img.src);
+              
+              // Call original handler if it exists
+              if (handleImageError) {
+                try {
+                  handleImageError();
+                } catch (e) {
+                  console.error('Error in handleImageError for', filename, ':', e);
+                }
+              }
+              
+              // Track error
+              imagesErroredCount++;
+              checkAllImagesLoaded();
+            };
+            
+            // Verify img is in DOM before setting src
+            if (!img.parentNode) {
+              if (DEBUG_MODE) console.error('CRITICAL: Image not in DOM when setting src:', filename);
+              // Try to find img in container
+              const container = containerData.find(d => d.filename === filename)?.container;
+              if (container) {
+                const domImg = container.querySelector('img');
+                if (domImg) {
+                  if (DEBUG_MODE) console.warn('Found img in DOM, using that instead');
+                  img = domImg;
+                } else {
+                  if (DEBUG_MODE) console.error('Cannot find img element in container for:', filename);
+                  return;
+                }
+              } else {
+                if (DEBUG_MODE) console.error('Cannot find container for:', filename);
+                return;
+              }
+            }
+            
+            // Attach event listeners BEFORE setting src
+            img.addEventListener('load', unifiedLoadHandler, { once: true });
+            img.addEventListener('error', unifiedErrorHandler, { once: true });
+            
+            // Set src to start loading - this MUST happen after listeners are attached
+            if (DEBUG_MODE) console.log('Setting img.src for:', filename, 'URL:', imageUrl, 'img in DOM:', !!img.parentNode, 'img complete:', img.complete);
+            img.src = imageUrl;
+            if (DEBUG_MODE) console.log('img.src is now:', img.src);
+            
+            // Check for cached images immediately (after setting src)
+            setTimeout(() => {
+              if (img.complete) {
+                if (img.naturalWidth > 0) {
+                  // Image is cached and loaded
+                  if (DEBUG_MODE) console.log('Image cached and loaded:', filename);
+                  unifiedLoadHandler();
+                } else if (img.src) {
+                  // Image failed to load
+                  if (DEBUG_MODE) console.warn('Image failed to load:', filename);
+                  unifiedErrorHandler();
+                }
+              }
+            }, 0);
+            
+            // Also check after a delay for slow-to-detect cached images
+            setTimeout(() => {
+              if (img.complete && !img.classList.contains('loaded')) {
+                if (img.naturalWidth > 0) {
+                  if (DEBUG_MODE) console.log('Image loaded (delayed check):', filename);
+                  unifiedLoadHandler();
+                } else if (img.src) {
+                  if (DEBUG_MODE) console.warn('Image failed (delayed check):', filename);
+                  unifiedErrorHandler();
+                }
+              }
+            }, 100);
+          }
+        });
+        
+        // PHASE 2: Hide loading screen after images start loading
+        if (isInitialLoad) {
+          // Ensure scroll is at top before hiding loading screen
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          
+          setTimeout(() => {
+            if (loadingScreen) {
+              loadingScreen.classList.add('hidden');
+            }
+            initialPageLoaded = true;
+            
+            // Ensure scroll stays at top after loading screen hides
+            requestAnimationFrame(() => {
+              window.scrollTo(0, 0);
+              document.documentElement.scrollTop = 0;
+              document.body.scrollTop = 0;
+            });
+          }, 300);
+        }
+          });
+        });
       });
     }
 
-    function filterImages(searchQuery) {
+    function filterImages(searchQuery, preserveScrollY = null) {
       const searchInput = document.getElementById('searchInput');
       const currentQuery = searchQuery || (searchInput ? searchInput.value : '');
       
-      // Reset to page 1 when filtering
-      currentPage = 1;
+      // Show processing status if filtering (not just initial load)
+      if (currentQuery.length >= 2 || activeModelFilter || showFavoritesOnly) {
+        updateProcessingStatus('Filtering images...', true);
+      }
+      
+      // Reset to page 1 when filtering (unless preserving scroll)
+      if (preserveScrollY === null) {
+        currentPage = 1;
+      }
       
       let filtered = [];
       
@@ -2905,7 +3483,23 @@
       }
       
       // Load current page (will create containers for filtered images)
-      loadCurrentPage();
+      // Preserve scroll position if provided, otherwise scroll to top
+      if (preserveScrollY !== null) {
+        loadCurrentPage(true);
+        // Restore scroll after layout
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            window.scrollTo(0, preserveScrollY);
+            document.documentElement.scrollTop = preserveScrollY;
+            document.body.scrollTop = preserveScrollY;
+            clearProcessingStatus();
+          });
+        });
+      } else {
+        loadCurrentPage(false);
+        // Clear processing status after a brief delay
+        setTimeout(() => clearProcessingStatus(), 500);
+      }
     }
 
     // Metadata extraction queue with concurrency limit
@@ -2986,44 +3580,336 @@
     // Embedded image list - injected by inject_image_list.py
     // IMAGE_LIST_PLACEHOLDER
     const embeddedImageList = [
-  "2025-11-25/00000-3326279137.png",
-  "2025-11-25/00001-3326279137-swapped.png",
-  "2025-11-25/00002-3104822491.png",
-  "2025-11-25/00003-3104822491-swapped.png",
-  "2025-11-25/00004-2725376216.png",
-  "2025-11-25/00005-2725376216-swapped.png",
-  "2025-11-25/00006-1460379678.png",
-  "2025-11-25/00007-1460379678-swapped.png",
-  "2025-11-25/00008-3025396646.png",
-  "2025-11-25/00009-3025396646-swapped.png",
-  "2025-11-25/00010-1208407017.png",
-  "2025-11-25/00011-1208407017-swapped.png",
-  "2025-11-25/00012-548204485.png",
-  "2025-11-25/00013-548204485-swapped.png",
-  "2025-11-25/00014-2516089774.png",
-  "2025-11-25/00015-2516089774-swapped.png",
-  "2025-11-25/00016-4186161600-swapped.png",
-  "2025-11-25/00017-4186161600-swapped.png",
-  "2025-11-25/00018-4186161600-swapped.png",
-  "2025-11-25/00019-4186161600-swapped.png",
-  "2025-11-25/00020-4186161600-swapped.png",
-  "2025-11-25/00021-4186161600-swapped.png",
-  "2025-11-25/00022-4186161600-swapped.png",
-  "2025-11-25/00023-4186161600-swapped.png",
-  "2025-11-25/00024-4186161600-swapped.png",
-  "2025-11-25/00025-4186161600-swapped.png",
-  "2025-11-25/00026-4186161600-swapped.png",
-  "2025-11-25/00027-4186161600-swapped.png",
-  "2025-11-25/00028-4186161600-swapped.png",
-  "2025-11-25/00029-4186161600-swapped.png",
-  "2025-11-25/00030-4186161600-swapped.png",
-  "Favorites/00014-2585734268-swapped.png",
-  "Favorites/00030-1676778117-swapped.png",
-  "Favorites/00044-159259098-swapped.png"
+  "2025-12-07/00002-3147677300-swapped.png",
+  "2025-12-07/00004-3147677300-swapped.png",
+  "2025-12-07/00006-3147677300-swapped.png",
+  "2025-12-07/00007-3147677300-swapped.png",
+  "2025-12-07/00008-3147677300-swapped.png",
+  "2025-12-07/00010-3147677300-swapped.png",
+  "2025-12-07/00011-3147677300-swapped.png",
+  "2025-12-07/00012-3147677300-swapped.png",
+  "2025-12-07/00014-3147677300-swapped.png",
+  "2025-12-07/00015-3147677300-swapped.png",
+  "2025-12-07/00019-3147677300-swapped.png",
+  "2025-12-07/00020-3147677300-swapped.png",
+  "2025-12-07/00021-3147677300-swapped.png",
+  "2025-12-07/00022-3147677300-swapped.png",
+  "2025-12-07/00023-3147677300-swapped.png",
+  "2025-12-07/00024-3147677300-swapped.png",
+  "2025-12-07/00025-3147677300-swapped.png",
+  "2025-12-07/00026-3147677300-swapped.png",
+  "2025-12-07/00027-3147677300-swapped.png",
+  "2025-12-07/00030-3147677300-swapped.png",
+  "2025-12-07/00033-3147677300-swapped.png",
+  "2025-12-07/00034-3147677300-swapped.png",
+  "2025-12-07/00035-3147677300-swapped.png",
+  "2025-12-07/00037-3147677300-swapped.png",
+  "2025-12-07/00039-3147677300-swapped.png",
+  "2025-12-07/00040-3147677300-swapped.png",
+  "2025-12-07/00041-3147677300-swapped.png",
+  "2025-12-07/00042-3147677300-swapped.png",
+  "2025-12-07/00045-3147677300-swapped.png",
+  "2025-12-07/00048-3147677300-swapped.png",
+  "2025-12-07/00051-3147677300-swapped.png",
+  "2025-12-07/00053-3147677300-swapped.png",
+  "2025-12-07/00054-3147677300-swapped.png",
+  "2025-12-07/00055-3147677300-swapped.png",
+  "2025-12-07/00056-3147677300-swapped.png",
+  "2025-12-07/00057-3147677300-swapped.png",
+  "2025-12-07/00059-3147677300-swapped.png",
+  "2025-12-07/00060-3147677300-swapped.png",
+  "2025-12-07/00061-3147677300-swapped.png",
+  "2025-12-07/00062-3147677300-swapped.png",
+  "2025-12-07/00063-3147677300-swapped.png",
+  "2025-12-07/00064-3147677300-swapped.png",
+  "2025-12-07/00065-3147677300-swapped.png",
+  "2025-12-07/00067-3147677300-swapped.png",
+  "2025-12-07/00070-3147677300-swapped.png",
+  "2025-12-07/00072-3147677300-swapped.png",
+  "2025-12-07/00074-3147677300-swapped.png",
+  "2025-12-07/00075-3147677300-swapped.png",
+  "2025-12-07/00076-3147677300-swapped.png",
+  "2025-12-07/00077-3147677300-swapped.png",
+  "2025-12-07/00078-3147677300-swapped.png",
+  "2025-12-07/00079-3147677300-swapped.png",
+  "2025-12-07/00080-3147677300-swapped.png",
+  "2025-12-07/00081-3147677300-swapped.png",
+  "2025-12-07/00082-3147677300-swapped.png",
+  "2025-12-07/00083-3147677300-swapped.png",
+  "2025-12-07/00088-3147677300-swapped.png",
+  "2025-12-07/00090-3147677300-swapped.png",
+  "2025-12-07/00091-3147677300-swapped.png",
+  "2025-12-07/00092-3147677300-swapped.png",
+  "2025-12-07/00094-3147677300-swapped.png",
+  "2025-12-07/00096-3147677300-swapped.png",
+  "2025-12-07/00097-3147677300-swapped.png",
+  "2025-12-07/00098-3147677300-swapped.png",
+  "2025-12-07/00099-3147677300-swapped.png",
+  "2025-12-07/00100-3147677300-swapped.png",
+  "2025-12-07/00101-3147677300-swapped.png",
+  "2025-12-07/00102-3147677300-swapped.png",
+  "2025-12-07/00103-3147677300-swapped.png",
+  "2025-12-07/00104-3147677300-swapped.png",
+  "2025-12-07/00105-3147677300-swapped.png",
+  "2025-12-07/00108-3147677300-swapped.png",
+  "2025-12-07/00109-3147677300-swapped.png",
+  "2025-12-07/00110-3147677300-swapped.png",
+  "2025-12-07/00111-3147677300-swapped.png",
+  "2025-12-07/00112-3147677300-swapped.png",
+  "2025-12-07/00113-3147677300-swapped.png",
+  "2025-12-07/00117-3147677300-swapped.png",
+  "2025-12-07/00118-3147677300-swapped.png",
+  "2025-12-07/00119-3147677300-swapped.png",
+  "2025-12-07/00120-3147677300-swapped.png",
+  "2025-12-07/00121-3147677300-swapped.png",
+  "2025-12-07/00122-3147677300-swapped.png",
+  "2025-12-07/00123-3147677300-swapped.png",
+  "2025-12-07/00124-3147677300-swapped.png",
+  "2025-12-07/00126-3147677300-swapped.png",
+  "2025-12-07/00127-3147677300-swapped.png",
+  "2025-12-07/00128-3147677300-swapped.png",
+  "2025-12-07/00129-3147677300-swapped.png",
+  "2025-12-07/00132-3147677300-swapped.png",
+  "2025-12-07/00133-3147677300-swapped.png",
+  "2025-12-07/00134-3147677300-swapped.png",
+  "2025-12-07/00135-3147677300-swapped.png",
+  "2025-12-07/00137-3147677300-swapped.png",
+  "2025-12-07/00138-3147677300-swapped.png",
+  "2025-12-07/00140-3147677300-swapped.png",
+  "2025-12-07/00141-3147677300-swapped.png",
+  "2025-12-07/00142-3147677300-swapped.png",
+  "2025-12-07/00143-3147677300-swapped.png",
+  "2025-12-07/00145-3147677300-swapped.png",
+  "2025-12-07/00147-3147677300-swapped.png",
+  "2025-12-07/00148-3147677300-swapped.png",
+  "2025-12-07/00150-3147677300-swapped.png",
+  "2025-12-07/00151-3147677300-swapped.png",
+  "2025-12-07/00152-3147677300-swapped.png",
+  "2025-12-07/00155-3147677300-swapped.png",
+  "2025-12-07/00157-3147677300-swapped.png",
+  "2025-12-07/00158-3147677300-swapped.png",
+  "2025-12-07/00159-3147677300-swapped.png",
+  "2025-12-07/00160-3147677300-swapped.png",
+  "2025-12-07/00161-3147677300-swapped.png",
+  "2025-12-07/00162-3147677300-swapped.png",
+  "2025-12-07/00163-3147677300-swapped.png",
+  "2025-12-07/00165-3147677300-swapped.png",
+  "2025-12-07/00166-3147677300-swapped.png",
+  "2025-12-07/00167-3147677300-swapped.png",
+  "2025-12-07/00168-3147677300-swapped.png",
+  "2025-12-07/00169-3147677300-swapped.png",
+  "2025-12-07/00170-3147677300-swapped.png",
+  "2025-12-07/00171-3147677300-swapped.png",
+  "2025-12-07/00172-3147677300-swapped.png",
+  "2025-12-07/00174-3147677300-swapped.png",
+  "2025-12-07/00175-3147677300-swapped.png",
+  "2025-12-07/00176-3147677300-swapped.png",
+  "2025-12-07/00177-3147677300-swapped.png",
+  "2025-12-07/00178-3147677300-swapped.png",
+  "2025-12-07/00179-3147677300-swapped.png",
+  "2025-12-07/00181-3147677300-swapped.png",
+  "2025-12-07/00182-3147677300-swapped.png",
+  "2025-12-07/00183-3147677300-swapped.png",
+  "2025-12-07/00184-3147677300-swapped.png",
+  "2025-12-07/00185-3147677300-swapped.png",
+  "2025-12-07/00186-3147677300-swapped.png",
+  "2025-12-07/00188-3147677300-swapped.png",
+  "2025-12-07/00189-3147677300-swapped.png",
+  "2025-12-07/00190-3147677300-swapped.png",
+  "2025-12-07/00191-3147677300-swapped.png",
+  "2025-12-07/00193-3147677300-swapped.png",
+  "2025-12-07/00194-3147677300-swapped.png",
+  "2025-12-07/00195-3147677300-swapped.png",
+  "2025-12-07/00196-3147677300-swapped.png",
+  "2025-12-07/00197-3147677300-swapped.png",
+  "2025-12-07/00198-3147677300-swapped.png",
+  "2025-12-07/00199-3147677300-swapped.png",
+  "2025-12-07/00200-3147677300-swapped.png",
+  "2025-12-07/00201-3147677300-swapped.png",
+  "2025-12-07/00202-3147677300-swapped.png",
+  "2025-12-07/00203-3147677300-swapped.png",
+  "2025-12-07/00204-3147677300-swapped.png",
+  "2025-12-07/00205-3147677300-swapped.png",
+  "2025-12-07/00206-3147677300-swapped.png",
+  "2025-12-07/00207-3147677300-swapped.png",
+  "2025-12-07/00208-3147677300-swapped.png",
+  "2025-12-07/00209-3147677300-swapped.png",
+  "2025-12-07/00210-3147677300-swapped.png",
+  "2025-12-07/00211-3147677300-swapped.png",
+  "2025-12-07/00212-3147677300-swapped.png",
+  "2025-12-07/00213-3147677300-swapped.png",
+  "2025-12-07/00214-3147677300-swapped.png",
+  "2025-12-07/00215-3147677300-swapped.png",
+  "2025-12-07/00216-3147677300-swapped.png",
+  "2025-12-07/00217-3147677300-swapped.png",
+  "2025-12-07/00218-3147677300-swapped.png",
+  "2025-12-07/00219-3147677300-swapped.png",
+  "2025-12-07/00221-3147677300-swapped.png",
+  "2025-12-07/00226-3147677300-swapped.png",
+  "2025-12-07/00229-3147677300-swapped.png",
+  "2025-12-07/00230-3147677300-swapped.png",
+  "2025-12-07/00231-3147677300-swapped.png",
+  "2025-12-07/00232-3147677300-swapped.png",
+  "2025-12-07/00233-3147677300-swapped.png",
+  "2025-12-07/00234-3147677300-swapped.png",
+  "2025-12-07/00235-3147677300-swapped.png",
+  "2025-12-07/00237-3147677300-swapped.png",
+  "2025-12-07/00238-3147677300-swapped.png",
+  "2025-12-07/00239-3147677300-swapped.png",
+  "2025-12-07/00240-3147677300-swapped.png",
+  "2025-12-07/00241-3147677300-swapped.png",
+  "2025-12-07/00242-3147677300-swapped.png",
+  "2025-12-07/00243-3147677300-swapped.png",
+  "2025-12-07/00244-3147677300-swapped.png",
+  "2025-12-07/00245-3147677300-swapped.png",
+  "2025-12-07/00246-3147677300-swapped.png",
+  "2025-12-07/00247-3147677300-swapped.png",
+  "2025-12-07/00248-3147677300-swapped.png",
+  "2025-12-07/00249-3147677300-swapped.png",
+  "2025-12-07/00250-3147677300-swapped.png",
+  "2025-12-07/00252-3147677300-swapped.png",
+  "2025-12-07/00253-3147677300-swapped.png",
+  "2025-12-07/00254-3147677300-swapped.png",
+  "2025-12-07/00255-3147677300-swapped.png",
+  "2025-12-07/00258-3147677300-swapped.png",
+  "2025-12-07/00259-3147677300-swapped.png",
+  "2025-12-07/00261-3147677300-swapped.png",
+  "2025-12-07/00262-3147677300-swapped.png",
+  "2025-12-07/00263-3147677300-swapped.png",
+  "2025-12-07/00264-3147677300-swapped.png",
+  "2025-12-07/00266-3147677300-swapped.png",
+  "2025-12-07/00267-3147677300-swapped.png",
+  "2025-12-07/00268-3147677300-swapped.png",
+  "2025-12-07/00270-3147677300-swapped.png",
+  "2025-12-07/00272-3147677300-swapped.png",
+  "2025-12-07/00273-3147677300-swapped.png",
+  "2025-12-07/00274-3147677300-swapped.png",
+  "2025-12-07/00275-3147677300-swapped.png",
+  "2025-12-07/00276-3147677300-swapped.png",
+  "2025-12-07/00277-3147677300-swapped.png",
+  "2025-12-07/00279-3147677300-swapped.png",
+  "2025-12-07/00280-3147677300-swapped.png",
+  "2025-12-07/00281-3147677300-swapped.png",
+  "Favorites/00000-3147677300-swapped.png",
+  "Favorites/00001-3147677300-swapped.png",
+  "Favorites/00003-3147677300-swapped.png",
+  "Favorites/00005-3147677300-swapped.png",
+  "Favorites/00009-3147677300-swapped.png",
+  "Favorites/00013-3147677300-swapped.png",
+  "Favorites/00016-3147677300-swapped.png",
+  "Favorites/00017-3147677300-swapped.png",
+  "Favorites/00018-3147677300-swapped.png",
+  "Favorites/00028-3147677300-swapped.png",
+  "Favorites/00029-3147677300-swapped.png",
+  "Favorites/00031-3147677300-swapped.png",
+  "Favorites/00032-3147677300-swapped.png",
+  "Favorites/00036-3147677300-swapped.png",
+  "Favorites/00038-3147677300-swapped.png",
+  "Favorites/00043-3147677300-swapped.png",
+  "Favorites/00044-3147677300-swapped.png",
+  "Favorites/00046-3147677300-swapped.png",
+  "Favorites/00047-3147677300-swapped.png",
+  "Favorites/00049-3147677300-swapped.png",
+  "Favorites/00050-3147677300-swapped.png",
+  "Favorites/00052-3147677300-swapped.png",
+  "Favorites/00058-3147677300-swapped.png",
+  "Favorites/00066-3147677300-swapped.png",
+  "Favorites/00068-3147677300-swapped.png",
+  "Favorites/00069-3147677300-swapped.png",
+  "Favorites/00071-3147677300-swapped.png",
+  "Favorites/00073-3147677300-swapped.png",
+  "Favorites/00084-3147677300-swapped.png",
+  "Favorites/00085-3147677300-swapped.png",
+  "Favorites/00086-3147677300-swapped.png",
+  "Favorites/00087-3147677300-swapped.png",
+  "Favorites/00089-3147677300-swapped.png",
+  "Favorites/00093-3147677300-swapped.png",
+  "Favorites/00095-3147677300-swapped.png",
+  "Favorites/00106-3147677300-swapped.png",
+  "Favorites/00107-3147677300-swapped.png",
+  "Favorites/00114-3147677300-swapped.png",
+  "Favorites/00115-3147677300-swapped.png",
+  "Favorites/00116-3147677300-swapped.png",
+  "Favorites/00125-3147677300-swapped.png",
+  "Favorites/00130-3147677300-swapped.png",
+  "Favorites/00131-3147677300-swapped.png",
+  "Favorites/00136-3147677300-swapped.png",
+  "Favorites/00139-3147677300-swapped.png",
+  "Favorites/00144-3147677300-swapped.png",
+  "Favorites/00146-3147677300-swapped.png",
+  "Favorites/00149-3147677300-swapped.png",
+  "Favorites/00153-3147677300-swapped.png",
+  "Favorites/00154-3147677300-swapped.png",
+  "Favorites/00156-3147677300-swapped.png",
+  "Favorites/00164-3147677300-swapped.png",
+  "Favorites/00173-3147677300-swapped.png",
+  "Favorites/00180-3147677300-swapped.png",
+  "Favorites/00187-3147677300-swapped.png",
+  "Favorites/00192-3147677300-swapped.png",
+  "Favorites/00220-3147677300-swapped.png",
+  "Favorites/00222-3147677300-swapped.png",
+  "Favorites/00223-3147677300-swapped.png",
+  "Favorites/00224-3147677300-swapped.png",
+  "Favorites/00225-3147677300-swapped.png",
+  "Favorites/00227-3147677300-swapped.png",
+  "Favorites/00228-3147677300-swapped.png",
+  "Favorites/00236-3147677300-swapped.png",
+  "Favorites/00251-3147677300-swapped.png",
+  "Favorites/00256-3147677300-swapped.png",
+  "Favorites/00257-3147677300-swapped.png",
+  "Favorites/00260-3147677300-swapped.png",
+  "Favorites/00265-3147677300-swapped.png",
+  "Favorites/00269-3147677300-swapped.png",
+  "Favorites/00271-3147677300-swapped.png",
+  "Favorites/00278-3147677300-swapped.png"
 ];
+    
+    // Function to clear all caches and reset state
+    function clearAllCaches() {
+      // Clear all in-memory caches
+      if (typeof imageDates !== 'undefined') imageDates.clear();
+      if (typeof imageMetadataCache !== 'undefined') imageMetadataCache.clear();
+      if (typeof imageSearchIndex !== 'undefined') imageSearchIndex.clear();
+      if (typeof imageDimensionsCache !== 'undefined') imageDimensionsCache.clear();
+      if (typeof favoriteOriginalPaths !== 'undefined') favoriteOriginalPaths.clear();
+      
+      // Clear layout cache
+      layoutCache = null;
+      
+      // Reset state flags
+      if (typeof allMetadataFetched !== 'undefined') allMetadataFetched = false;
+      if (typeof metadataFetchInProgress !== 'undefined') metadataFetchInProgress = false;
+      if (typeof initialPageLoaded !== 'undefined') initialPageLoaded = false;
+      if (typeof backgroundIndexingScheduled !== 'undefined') backgroundIndexingScheduled = false;
+      
+      // Clear any pending timeouts
+      if (typeof window.finalLayoutTimeout !== 'undefined' && window.finalLayoutTimeout) {
+        clearTimeout(window.finalLayoutTimeout);
+        window.finalLayoutTimeout = null;
+      }
+      if (typeof window.imageLoadLayoutTimeout !== 'undefined' && window.imageLoadLayoutTimeout) {
+        clearTimeout(window.imageLoadLayoutTimeout);
+        window.imageLoadLayoutTimeout = null;
+      }
+      if (typeof resizeThrottle !== 'undefined' && resizeThrottle) {
+        clearTimeout(resizeThrottle);
+        resizeThrottle = null;
+      }
+      if (typeof searchDebounce !== 'undefined' && searchDebounce) {
+        clearTimeout(searchDebounce);
+        searchDebounce = null;
+      }
+      
+      // Clear processing status
+      clearProcessingStatus();
+      
+      debugLog('[Cache] All caches cleared');
+    }
     
     // Function to initialize/reinitialize the gallery
     function initializeGallery(imageList) {
+      // Clear all caches first to ensure fresh start
+      clearAllCaches();
       // Load favorites history from localStorage on init
       loadFavoritesHistory();
       
@@ -3031,16 +3917,24 @@
       const gallery = document.getElementById('gallery');
       gallery.innerHTML = '';
       allImageContainers = [];
-      
-      // Reset metadata index for fresh scan
-      imageSearchIndex.clear();
-      allMetadataFetched = false;
-      metadataFetchInProgress = false;
-      initialPageLoaded = false;
-      backgroundIndexingScheduled = false;
+      galleryColumns = [];
       
       // Reset pagination
       currentPage = 1;
+      
+      // Reset filters and sort
+      sortState = { filename: null, date: null };
+      showFavoritesOnly = false;
+      activeModelFilter = null;
+      
+      // Clear search input
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        searchInput.value = '';
+      }
+      
+      // Reset sort button icons
+      updateSortButtonIcons();
       
       // Initialize image count
       updateImageCount();
@@ -3071,12 +3965,18 @@
       reloadBtn.classList.add('loading');
       reloadBtn.disabled = true;
       
+      // Clear all caches before reloading
+      clearAllCaches();
+      
       try {
-        // Call the rescan endpoint to get updated image list
-        const response = await fetch('/rescan-images', {
+        // Call the rescan endpoint to get updated image list with cache-busting
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/rescan-images?t=${timestamp}`, {
           cache: 'no-store',
+          method: 'GET',
           headers: {
-            'Cache-Control': 'no-cache'
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           }
         });
         
@@ -3113,8 +4013,25 @@
       }
     }
     
+    // Clear caches on page unload to ensure fresh start on next load
+    window.addEventListener('beforeunload', function() {
+      clearAllCaches();
+    });
+    
+    // Force hard reload on page visibility change (handles browser refresh)
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) {
+        // Page became visible - could be a refresh
+        // Clear caches to ensure fresh data
+        clearAllCaches();
+      }
+    });
+    
     // Use embedded image list directly
     (function() {
+      // Clear all caches on page load to ensure fresh start
+      clearAllCaches();
+      
       // Initialize UI from settings (must happen before gallery initialization)
       initializeModelFilters();
       initializeSizeSlider();
@@ -3123,10 +4040,10 @@
       // Re-attach model filter button event listeners after generating buttons
       function attachModelFilterListeners() {
         const modelFilterBtns = document.querySelectorAll('.model-filter-btn');
-        console.log(`[Model Filter] Found ${modelFilterBtns.length} buttons to attach listeners to`);
+        debugLog(`[Model Filter] Found ${modelFilterBtns.length} buttons to attach listeners to`);
         
         if (modelFilterBtns.length === 0) {
-          console.error('[Model Filter] No buttons found!');
+          if (DEBUG_MODE) console.error('[Model Filter] No buttons found!');
           return;
         }
         
@@ -3138,7 +4055,7 @@
           const model = newBtn.dataset.model;
           const containsText = newBtn.getAttribute('data-contains');
           
-          console.log(`[Model Filter] Attaching listener to button ${index}: ${model} (contains: ${containsText})`);
+          debugLog(`[Model Filter] Attaching listener to button ${index}: ${model} (contains: ${containsText})`);
           
           newBtn.addEventListener('click', async function(e) {
             e.preventDefault();
@@ -3148,14 +4065,12 @@
             const clickedModel = this.dataset.model;
             const clickedBtn = this;
             
-            console.log(`[Model Filter] Button clicked: ${clickedModel}`);
             debugLog(`[Model Filter] Button clicked: ${clickedModel}`);
             
             // Toggle: if already active, deactivate; otherwise activate this one
             if (activeModelFilter === clickedModel) {
               activeModelFilter = null;
               clickedBtn.classList.remove('active');
-              console.log(`[Model Filter] Deactivated ${clickedModel} filter`);
               debugLog(`[Model Filter] Deactivated ${clickedModel} filter`);
               logToServer('model_filter', { model: null, action: 'deactivate' });
               // Re-apply filter immediately when deactivating
@@ -3168,17 +4083,14 @@
               activeModelFilter = clickedModel;
               clickedBtn.classList.add('active');
               
-              console.log(`[Model Filter] Activating ${clickedModel} filter...`);
               debugLog(`[Model Filter] Activating ${clickedModel} filter...`);
               logToServer('model_filter', { model: clickedModel, action: 'activate' });
               
               // If metadata is already fetched, apply filter immediately
               if (allMetadataFetched) {
-                console.log(`[Model Filter] Metadata ready, applying ${clickedModel} filter...`);
                 debugLog(`[Model Filter] Metadata ready, applying ${clickedModel} filter...`);
                 const searchInput = document.getElementById('searchInput');
                 filterImages(searchInput ? searchInput.value : '');
-                console.log(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
                 debugLog(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
                 logToServer('model_filter_result', { model: clickedModel, resultCount: filteredImageFiles.length });
               } else {
@@ -3187,7 +4099,6 @@
                   clickedBtn.classList.add('indexing');
                   updateModelFilterButtonsState(true, 0);
                   
-                  console.log(`[Model Filter] Applying ${clickedModel} filter...`);
                   debugLog(`[Model Filter] Applying ${clickedModel} filter...`);
                   
                   await fetchAllImageMetadata(false);
@@ -3197,7 +4108,6 @@
                   filterImages(searchInput ? searchInput.value : '');
                   
                   // Log results
-                  console.log(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
                   debugLog(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
                   logToServer('model_filter_result', { model: clickedModel, resultCount: filteredImageFiles.length });
                 } catch (err) {
@@ -3211,7 +4121,7 @@
           });
         });
         
-        console.log(`[Model Filter] Successfully attached listeners to ${modelFilterBtns.length} buttons`);
+        debugLog(`[Model Filter] Successfully attached listeners to ${modelFilterBtns.length} buttons`);
       }
       
       // Attach listeners after a brief delay to ensure DOM is ready
@@ -3240,51 +4150,8 @@
           reloadBtn.addEventListener('click', reloadImages);
         }
         
-        // Set up page size selector (both in pagination bar and standalone)
-        function setupPageSizeSelector(container) {
-          const pageSizeItems = container.querySelectorAll('.pagination-page-size-item');
-          pageSizeItems.forEach(item => {
-            item.addEventListener('click', function() {
-              const newSize = parseInt(this.getAttribute('data-size'));
-              if (newSize !== imagesPerPage) {
-                debugLog(`[Page Size] Changed to ${newSize} images per page`);
-                logToServer('page_size_change', { size: newSize });
-                imagesPerPage = newSize;
-                // Update active state in both containers
-                document.querySelectorAll('.pagination-page-size-item').forEach(i => {
-                  if (parseInt(i.getAttribute('data-size')) === newSize) {
-                    i.classList.add('active');
-                  } else {
-                    i.classList.remove('active');
-                  }
-                });
-                // Invalidate layout cache before reloading
-                layoutCache = null;
-                // Reset to page 1
-                currentPage = 1;
-                // Update pagination UI first (this updates page count)
-                updatePaginationUI();
-                // Then reload images with new page size
-                loadCurrentPage();
-                
-                // Force scroll to top - use multiple methods to ensure it works
-                window.scrollTo(0, 0);
-                document.documentElement.scrollTop = 0;
-                document.body.scrollTop = 0;
-              }
-            });
-          });
-        }
-        
-        // Set up page size selectors
-        const paginationPageSize = document.getElementById('paginationPageSize');
-        const paginationPageSizeStandalone = document.getElementById('bottomNavPageSizeStandalone');
-        if (paginationPageSize) {
-          setupPageSizeSelector(paginationPageSize.parentElement);
-        }
-        if (paginationPageSizeStandalone) {
-          setupPageSizeSelector(paginationPageSizeStandalone);
-        }
+        // Page size selectors are now set up in initializePaging() function
+        // which is called earlier in the initialization sequence
         
         // Set up auto-hide/show for top and bottom bars based on mouse proximity
         const topNav = document.querySelector('.top-nav');
@@ -3295,65 +4162,57 @@
         let mouseY = -1; // Initialize to -1 so we know it hasn't been set yet
         let showBarsTimeout = null;
         
-        // Make updateBarsVisibility accessible from loadCurrentPage
+        // SIMPLIFIED BAR VISIBILITY - Single source of truth
+        // Rules:
+        // 1. Show bottom bar if loading/processing
+        // 2. Show top AND bottom bars if mouse near edges
+        // 3. Otherwise hide both
         window.updateBarsVisibility = function() {
           const windowHeight = window.innerHeight;
-          // If mouseY hasn't been set yet, assume middle of screen (bars hidden)
           const currentMouseY = mouseY < 0 ? windowHeight / 2 : mouseY;
           const nearTop = currentMouseY <= PROXIMITY_THRESHOLD;
-          const nearBottom = currentMouseY >= windowHeight - PROXIMITY_THRESHOLD;
-          const gallery = document.getElementById('gallery');
+          const nearBottom = currentMouseY >= (windowHeight - PROXIMITY_THRESHOLD);
+          
+          // Check if loading/processing is active
           const loadingBarContainer = document.getElementById('loadingBarContainer');
-          
-          // Check if loading is in progress
+          const processingIndicator = document.getElementById('processingIndicator');
           const isCurrentlyLoading = loadingBarContainer && !loadingBarContainer.classList.contains('hidden');
+          const isProcessing = processingIndicator && processingIndicator.classList.contains('active');
+          const isLoadingOrProcessing = isCurrentlyLoading || isProcessing;
           
-          // Show/hide top nav (always show if loading, or mouse near top)
-          let topBarVisible = false;
+          // Determine visibility
+          const showTopBar = nearTop || isLoadingOrProcessing;
+          const showBottomBar = nearBottom || isLoadingOrProcessing;
+          
+          // Apply visibility
           if (topNav) {
-            if (nearTop || isCurrentlyLoading) {
+            if (showTopBar) {
               topNav.classList.add('visible');
-              topBarVisible = true;
             } else {
               topNav.classList.remove('visible');
             }
           }
           
-          // Show/hide bottom nav - show when:
-          // 1. Loading is in progress, OR
-          // 2. Mouse is within threshold of bottom edge (nearBottom)
-          let bottomBarVisible = false;
           if (bottomNav && !bottomNav.classList.contains('hidden')) {
-            // Show if:
-            // - Loading, OR
-            // - Mouse near bottom edge
-            const shouldShow = isCurrentlyLoading || nearBottom;
-            
-            // Always explicitly set visibility - don't rely on default state
-            if (shouldShow) {
+            if (showBottomBar) {
               bottomNav.classList.add('visible');
-              bottomBarVisible = true;
             } else {
-              // Explicitly hide if conditions not met
               bottomNav.classList.remove('visible');
             }
           }
           
           if (pageSizeStandalone && !pageSizeStandalone.classList.contains('hidden')) {
-            // Same logic for standalone page size selector
-            const shouldShow = isCurrentlyLoading || nearBottom;
-            if (shouldShow) {
+            if (showBottomBar) {
               pageSizeStandalone.classList.add('visible');
-              bottomBarVisible = true;
             } else {
-              // Explicitly hide if conditions not met
               pageSizeStandalone.classList.remove('visible');
             }
           }
           
-          // Update gallery spacing - only add margin-top when top bar is visible
+          // Update gallery spacing
+          const gallery = document.getElementById('gallery');
           if (gallery) {
-            if (topBarVisible) {
+            if (showTopBar) {
               gallery.classList.add('top-bar-visible');
             } else {
               gallery.classList.remove('top-bar-visible');
@@ -3361,13 +4220,13 @@
           }
         }
         
-        // Track mouse position - only update when mouse actually moves
+        // Track mouse position - update visibility on every mouse move
         let lastMouseY = -1;
         document.addEventListener('mousemove', function(e) {
           mouseY = e.clientY;
-          // Only update visibility if mouse position actually changed significantly
-          // This prevents constant updates when mouse is stationary
-          if (Math.abs(mouseY - lastMouseY) > 5) {
+          // Always update visibility on mouse move to ensure bars show/hide correctly
+          // Only skip if position hasn't changed significantly (optimization)
+          if (Math.abs(mouseY - lastMouseY) > 5 || lastMouseY < 0) {
             lastMouseY = mouseY;
             updateBarsVisibility();
           }
@@ -3382,15 +4241,9 @@
         // Hide bars when mouse leaves window (with delay)
         document.addEventListener('mouseleave', function() {
           showBarsTimeout = setTimeout(() => {
-            if (topNav) {
-              topNav.classList.remove('visible');
-            }
-            if (bottomNav) {
-              bottomNav.classList.remove('visible');
-            }
-            if (pageSizeStandalone) {
-              pageSizeStandalone.classList.remove('visible');
-            }
+            // Set mouseY to middle so bars hide
+            mouseY = window.innerHeight / 2;
+            updateBarsVisibility();
           }, 1000); // Hide after 1 second of mouse leaving
         });
         
@@ -3405,30 +4258,12 @@
         });
         
         // Initial check on page load - ensure bars start hidden
-        // Bottom bar should ALWAYS start hidden, only show when mouse is near bottom
-        setTimeout(() => {
-          // If mouseY hasn't been set by mousemove, set it to middle so bars don't show by default
-          if (mouseY < 0) {
-            mouseY = window.innerHeight / 2;
-          }
-          // Explicitly hide bottom bar on initial load - it should only show when mouse is near bottom
-          if (bottomNav && !bottomNav.classList.contains('hidden')) {
-            bottomNav.classList.remove('visible');
-          }
-          if (pageSizeStandalone && !pageSizeStandalone.classList.contains('hidden')) {
-            pageSizeStandalone.classList.remove('visible');
-          }
-          // Then update visibility based on actual conditions (will hide bottom bar since mouse is in middle)
-          updateBarsVisibility();
-        }, 100);
-        
-        // Also ensure bottom bar is hidden immediately on page load
-        if (bottomNav && !bottomNav.classList.contains('hidden')) {
-          bottomNav.classList.remove('visible');
+        // Set mouseY to middle of screen so bars don't show by default
+        if (mouseY < 0) {
+          mouseY = window.innerHeight / 2;
         }
-        if (pageSizeStandalone && !pageSizeStandalone.classList.contains('hidden')) {
-          pageSizeStandalone.classList.remove('visible');
-        }
+        // Call updateBarsVisibility to set initial state (bars hidden since mouse in middle)
+        updateBarsVisibility();
         
         // Set up search input listener
         const searchInput = document.getElementById('searchInput');
@@ -3466,13 +4301,23 @@
         });
         
         // Handle window resize with throttling
+        // Preserve scroll position during resize-triggered layout updates
         window.addEventListener('resize', function() {
           if (resizeThrottle) {
             clearTimeout(resizeThrottle);
           }
           resizeThrottle = setTimeout(() => {
             layoutCache = null; // Invalidate cache on resize
-            layoutMasonry();
+            // Use non-blocking layout update to allow scrolling during resize
+            if (window.requestIdleCallback) {
+              window.requestIdleCallback(() => {
+                layoutMasonry();
+              }, { timeout: 1000 });
+            } else {
+              requestAnimationFrame(() => {
+                layoutMasonry();
+              });
+            }
             resizeThrottle = null;
           }, 150);
         });
@@ -3480,6 +4325,12 @@
 
     // Size control handlers
     function updateImageSizes() {
+      // Preserve scroll position
+      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Show processing status
+      updateProcessingStatus('Resizing images...', true);
+      
       // Cancel any pending layout operations to prevent conflicts
       if (typeof window.finalLayoutTimeout !== 'undefined' && window.finalLayoutTimeout) {
         clearTimeout(window.finalLayoutTimeout);
@@ -3556,7 +4407,21 @@
                 allImageContainers[0] && void allImageContainers[0].offsetHeight;
               }
               
-              layoutMasonry();
+              // layoutMasonry() now preserves scroll position internally
+              // Use non-blocking update to allow scrolling during resize
+              if (window.requestIdleCallback) {
+                window.requestIdleCallback(() => {
+                  layoutMasonry();
+                  clearProcessingStatus();
+                }, { timeout: 1000 });
+              } else {
+                requestAnimationFrame(() => {
+                  layoutMasonry();
+                  clearProcessingStatus();
+                });
+              }
+            } else {
+              clearProcessingStatus();
             }
           }, 100); // Increased delay to ensure browser has fully recalculated dimensions
         });
@@ -3607,42 +4472,126 @@
     
     // Initialize paging from settings
     function initializePaging() {
-      const containers = [
-        document.getElementById('paginationPageSize')?.parentElement,
-        document.getElementById('bottomNavPageSizeStandalone')
-      ].filter(Boolean);
+      // Set up page size selectors directly (don't regenerate - use existing HTML)
+      const paginationPageSize = document.getElementById('paginationPageSize');
+      const paginationPageSizeStandalone = document.getElementById('bottomNavPageSizeStandalone');
       
-      containers.forEach(container => {
-        if (!container) return;
-        
-        // Find the page size container
-        const pageSizeContainer = container.querySelector('.bottom-nav-center') || 
-                                  container.querySelector('.pagination-page-size');
-        if (!pageSizeContainer) return;
-        
-        // Clear existing items
-        pageSizeContainer.innerHTML = '';
-        
-        // Generate from settings
-        PAGING_SETTINGS.options.forEach((size, index) => {
-          const item = document.createElement('span');
-          item.className = 'pagination-page-size-item';
-          if (size === PAGING_SETTINGS.default) {
-            item.classList.add('active');
-          }
-          item.setAttribute('data-size', size.toString());
-          item.textContent = size.toString();
-          pageSizeContainer.appendChild(item);
+      // Set up event listeners for the main pagination page size selector
+      if (paginationPageSize) {
+        const pageSizeItems = paginationPageSize.querySelectorAll('.pagination-page-size-item');
+        pageSizeItems.forEach(item => {
+          // Remove any existing listeners by cloning
+          const newItem = item.cloneNode(true);
+          item.parentNode.replaceChild(newItem, item);
           
-          // Add separator (except after last item)
-          if (index < PAGING_SETTINGS.options.length - 1) {
-            const separator = document.createElement('span');
-            separator.className = 'pagination-page-size-separator';
-            separator.textContent = '·';
-            pageSizeContainer.appendChild(separator);
-          }
+          // Add click listener
+          newItem.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const newSize = parseInt(this.getAttribute('data-size'));
+            debugLog(`[Page Size] Clicked on size: ${newSize}, current: ${imagesPerPage}`);
+            if (newSize !== imagesPerPage) {
+              // Preserve scroll position
+              const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+              
+              // Show processing status
+              updateProcessingStatus('Changing page size...', true);
+              
+              debugLog(`[Page Size] Changed to ${newSize} images per page`);
+              logToServer('page_size_change', { size: newSize });
+              imagesPerPage = newSize;
+              
+              // Update active state in both containers
+              document.querySelectorAll('.pagination-page-size-item').forEach(i => {
+                if (parseInt(i.getAttribute('data-size')) === newSize) {
+                  i.classList.add('active');
+                } else {
+                  i.classList.remove('active');
+                }
+              });
+              
+              // Invalidate layout cache before reloading
+              layoutCache = null;
+              // Reset to page 1
+              currentPage = 1;
+              // Update pagination UI first (this updates page count)
+              updatePaginationUI();
+              // Then reload images with new page size
+              loadCurrentPage(false);
+              
+              // Restore scroll position after layout
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  window.scrollTo(0, scrollY);
+                  document.documentElement.scrollTop = scrollY;
+                  document.body.scrollTop = scrollY;
+                  clearProcessingStatus();
+                });
+              });
+            }
+          });
         });
-      });
+      }
+      
+      // Set up event listeners for the standalone page size selector
+      if (paginationPageSizeStandalone) {
+        const standalonePageSize = paginationPageSizeStandalone.querySelector('.pagination-page-size');
+        if (standalonePageSize) {
+          const pageSizeItems = standalonePageSize.querySelectorAll('.pagination-page-size-item');
+          pageSizeItems.forEach(item => {
+            // Remove any existing listeners by cloning
+            const newItem = item.cloneNode(true);
+            item.parentNode.replaceChild(newItem, item);
+            
+            // Add click listener (same handler as above)
+            newItem.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              const newSize = parseInt(this.getAttribute('data-size'));
+              debugLog(`[Page Size] Clicked on size: ${newSize}, current: ${imagesPerPage}`);
+              if (newSize !== imagesPerPage) {
+                // Preserve scroll position
+                const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+                
+                // Show processing status
+                updateProcessingStatus('Changing page size...', true);
+                
+                debugLog(`[Page Size] Changed to ${newSize} images per page`);
+                logToServer('page_size_change', { size: newSize });
+                imagesPerPage = newSize;
+                
+                // Update active state in both containers
+                document.querySelectorAll('.pagination-page-size-item').forEach(i => {
+                  if (parseInt(i.getAttribute('data-size')) === newSize) {
+                    i.classList.add('active');
+                  } else {
+                    i.classList.remove('active');
+                  }
+                });
+                
+                // Invalidate layout cache before reloading
+                layoutCache = null;
+                // Reset to page 1
+                currentPage = 1;
+                // Update pagination UI first (this updates page count)
+                updatePaginationUI();
+                // Then reload images with new page size
+                loadCurrentPage(false);
+                
+                // Restore scroll position after layout
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    window.scrollTo(0, scrollY);
+                    document.documentElement.scrollTop = scrollY;
+                    document.body.scrollTop = scrollY;
+                    clearProcessingStatus();
+                  });
+                });
+              }
+            });
+          });
+        }
+      }
     }
     
     // Initialize everything from settings
@@ -3751,6 +4700,12 @@
     }
 
     async function sortByFilename() {
+      // Preserve scroll position
+      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Show processing status
+      updateProcessingStatus('Sorting images...', true);
+      
       // Toggle sort direction
       if (sortState.filename === null || sortState.filename === 'desc') {
         sortState.filename = 'asc';
@@ -3776,13 +4731,22 @@
       // Re-apply all active filters (model, favorites, search) after sorting
       const searchInput = document.getElementById('searchInput');
       const searchQuery = searchInput ? searchInput.value : '';
-      filterImages(searchQuery);
+      filterImages(searchQuery, scrollY);
       
       // Update sort button icons
       updateSortButtonIcons();
+      
+      // Clear processing status after a brief delay
+      setTimeout(() => clearProcessingStatus(), 500);
     }
 
     async function sortByDate() {
+      // Preserve scroll position
+      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Show processing status
+      updateProcessingStatus('Sorting by date...', true);
+      
       // Toggle sort direction
       if (sortState.date === null || sortState.date === 'desc') {
         sortState.date = 'asc';
@@ -3834,10 +4798,13 @@
       // Re-apply all active filters (model, favorites, search) after sorting
       const searchInput = document.getElementById('searchInput');
       const searchQuery = searchInput ? searchInput.value : '';
-      filterImages(searchQuery);
+      filterImages(searchQuery, scrollY);
       
       // Update sort button icons
       updateSortButtonIcons();
+      
+      // Clear processing status after a brief delay
+      setTimeout(() => clearProcessingStatus(), 500);
     }
 
     // Set up sort button handlers
@@ -4581,7 +5548,20 @@
         // Add created date if we have image source
         if (imageSrc) {
           try {
-            const date = await getFileDate(imageSrc);
+            // Extract filename from URL - imageSrc might be a full URL like "http://localhost:8000/path/to/image.png"
+            // We need just the path part for getFileDate
+            let filenameForDate = imageSrc;
+            try {
+              const url = new URL(imageSrc);
+              filenameForDate = url.pathname; // Get just the path part
+              // Remove leading slash if present
+              if (filenameForDate.startsWith('/')) {
+                filenameForDate = filenameForDate.substring(1);
+              }
+            } catch (e) {
+              // If it's not a valid URL, use as-is (might already be a filename)
+            }
+            const date = await getFileDate(filenameForDate);
             displayData['Created Date'] = date.toLocaleString();
           } catch (err) {
             // If date fetch fails, skip it
@@ -4669,6 +5649,8 @@
     let galleryScrollStartY = 0;
     let galleryScrollStartScroll = 0;
     let galleryHasScrolled = false;
+    // Global flag to prevent clicks after drag-scroll
+    window.galleryHasScrolled = false;
     
     function setupGalleryScrolling() {
       const gallery = document.getElementById('gallery');
@@ -4748,19 +5730,15 @@
           if (galleryHasScrolled) {
             const imgContainer = e.target.closest('.img-container');
             if (imgContainer) {
-              // Cancel the click event on the image to prevent lightbox from opening
-              e.preventDefault();
-              e.stopPropagation();
-              // Also stop the click event that might fire after mouseup
-              imgContainer.addEventListener('click', function cancelClick(evt) {
-                evt.preventDefault();
-                evt.stopPropagation();
-                evt.stopImmediatePropagation();
-                imgContainer.removeEventListener('click', cancelClick, true);
-              }, true);
+              // Set a flag to prevent click for a short time
+              window.galleryHasScrolled = true;
+              setTimeout(() => {
+                window.galleryHasScrolled = false;
+              }, 100);
             }
           }
           galleryScrolling = false;
+          galleryHasScrolled = false; // Reset for next drag
           gallery.classList.remove('scrolling');
         }
       });

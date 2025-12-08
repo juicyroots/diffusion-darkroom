@@ -70,15 +70,22 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             traceback.print_exc(file=sys.stderr)
     
     def do_GET(self):
-        if self.path == '/rescan-images':
+        # Parse path to handle query strings
+        parsed_path = urlparse(self.path)
+        path_without_query = parsed_path.path
+        
+        if path_without_query == '/rescan-images':
             try:
                 # Rescan images
                 image_files = scan_images()
                 
-                # Send response
+                # Send response with cache-busting headers
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header('Expires', '0')
                 self.end_headers()
                 self.wfile.write(json.dumps({'images': image_files, 'count': len(image_files)}).encode())
                 print(f"{format_timestamp()} Images Folders Re-Scanned and Loaded: {len(image_files)} images", file=sys.stderr)
@@ -98,7 +105,35 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             # Default behavior for other GET requests (serve files)
             try:
-                return super().do_GET()
+                # Handle HTML files with cache-busting headers
+                if path_without_query.endswith('.html') or path_without_query == '/darkroom.html' or path_without_query == '/':
+                    # Normalize path
+                    if path_without_query == '/':
+                        file_path = 'darkroom.html'
+                    else:
+                        file_path = path_without_query.lstrip('/')
+                    
+                    # Check if file exists before sending response
+                    if not os.path.exists(file_path):
+                        self.send_error(404, "File not found")
+                        return
+                    
+                    # Send response with cache-busting headers
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html; charset=utf-8')
+                    self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                    self.send_header('Pragma', 'no-cache')
+                    self.send_header('Expires', '0')
+                    self.end_headers()
+                    
+                    # Read and send the file
+                    with open(file_path, 'rb') as f:
+                        self.wfile.write(f.read())
+                    return
+                else:
+                    # For other files, use parent class but we can't easily add headers
+                    # The parent class will handle the response properly
+                    return super().do_GET()
             except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError) as e:
                 # Client disconnected while serving file - this is normal
                 error_code = getattr(e, 'winerror', getattr(e, 'errno', None))
@@ -455,8 +490,10 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 Handler = CustomHTTPRequestHandler
 httpd = socketserver.TCPServer(("", port), Handler)
 
-# Open browser
-url = f"http://localhost:{port}/darkroom.html"
+# Open browser with cache-busting parameter to ensure fresh load
+import time
+timestamp = int(time.time())
+url = f"http://localhost:{port}/darkroom.html?v={timestamp}"
 print(f"{format_timestamp()} Launching Darkroom: Opening {url}", file=sys.stderr)
 webbrowser.open(url)
 
