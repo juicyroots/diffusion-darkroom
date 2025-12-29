@@ -1,0 +1,6 @@
+# Exclude Favorites folder
+Favorites/
+
+# Exclude date folders (yyyy-mm-dd format)
+[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+
