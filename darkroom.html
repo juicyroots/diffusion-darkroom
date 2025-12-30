@@ -5,7 +5,9 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Diffusion Darkroom Gallery</title>
+  <title>Diffusion Darkroom
+    
+  </title>
   <link rel="icon" type="image/png" href="darkroom.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5189,6 +5191,17 @@
       reloadBtn.classList.add('loading');
       reloadBtn.disabled = true;
       
+      // PRESERVE all user state before reloading
+      const searchInput = document.getElementById('searchInput');
+      const preservedSearchQuery = searchInput ? searchInput.value : '';
+      const preservedShowFavoritesOnly = showFavoritesOnly;
+      const preservedActiveModelFilter = activeModelFilter;
+      const preservedActiveRatingFilters = new Set(activeRatingFilters); // Clone the Set
+      const preservedSortState = { ...sortState }; // Clone the sort state
+      const preservedCurrentPage = currentPage;
+      const preservedImagesPerPage = imagesPerPage;
+      const preservedSizeMultiplier = currentSizeMultiplier;
+      
       // Clear all caches before reloading
       clearAllCaches();
       
@@ -5218,13 +5231,168 @@
           throw new Error('Invalid response format from server');
         }
         
-        // Reinitialize gallery with new image list
+        // Reinitialize gallery with new image list (this resets everything)
         initializeGallery(data.images);
+        
+        // RESTORE preserved state
+        // Restore search query
+        if (searchInput && preservedSearchQuery) {
+          searchInput.value = preservedSearchQuery;
+        }
+        
+        // Restore filters
+        showFavoritesOnly = preservedShowFavoritesOnly;
+        activeModelFilter = preservedActiveModelFilter;
+        activeRatingFilters = preservedActiveRatingFilters;
+        
+        // Restore sort state
+        sortState = preservedSortState;
+        
+        // Restore pagination settings
+        imagesPerPage = preservedImagesPerPage;
+        currentSizeMultiplier = preservedSizeMultiplier;
+        
+        // Update UI elements to reflect restored state
+        // Update favorites filter button
+        const favoritesFilterBtn = document.getElementById('favoritesFilter');
+        if (favoritesFilterBtn) {
+          if (showFavoritesOnly) {
+            favoritesFilterBtn.classList.add('favorites-active');
+          } else {
+            favoritesFilterBtn.classList.remove('favorites-active');
+          }
+        }
+        
+        // Update model filter buttons
+        document.querySelectorAll('.model-filter-btn').forEach(btn => {
+          if (btn.dataset.model === activeModelFilter) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+        
+        // Update rating filter stars (clear all first, then set active ones)
+        document.querySelectorAll('.rating-filter-star').forEach(star => {
+          star.classList.remove('active');
+        });
+        activeRatingFilters.forEach(rating => {
+          const ratingStar = document.querySelector(`.rating-filter-star[data-rating="${rating}"]`);
+          if (ratingStar) {
+            ratingStar.classList.add('active');
+          }
+        });
+        
+        // Update page size selector
+        document.querySelectorAll('.pagination-page-size-item').forEach(item => {
+          if (parseInt(item.getAttribute('data-size')) === imagesPerPage) {
+            item.classList.add('active');
+          } else {
+            item.classList.remove('active');
+          }
+        });
+        
+        // Update size slider
+        const sizeSlider = document.getElementById('sizeSlider');
+        if (sizeSlider) {
+          sizeSlider.value = preservedSizeMultiplier.toString();
+        }
+        
+        // Update sort button icons
+        updateSortButtonIcons();
+        
+        // Reapply filters and sort (this will update filteredImageFiles and apply sorting)
+        if (preservedSortState.filename !== null) {
+          // Reapply filename sort
+          const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+          const sorted = [...allImageFiles].sort((a, b) => {
+            const aName = getFilenameOnly(a).toLowerCase();
+            const bName = getFilenameOnly(b).toLowerCase();
+            const result = collator.compare(aName, bName);
+            return preservedSortState.filename === 'asc' ? result : -result;
+          });
+          allImageFiles = sorted;
+        } else if (preservedSortState.date !== null) {
+          // Reapply date sort (async - fetch dates in batches like sortByDate does)
+          updateProcessingStatus('Sorting by date...', true);
+          
+          const BATCH_SIZE = 20;
+          const indices = allImageFiles.map((filename, index) => ({ index, filename }));
+          
+          // Fetch dates in batches
+          for (let i = 0; i < indices.length; i += BATCH_SIZE) {
+            const batch = indices.slice(i, i + BATCH_SIZE);
+            await Promise.all(batch.map(async (item) => {
+              item.date = await getFileDate(item.filename);
+            }));
+            
+            // Yield to browser between batches
+            if (i + BATCH_SIZE < indices.length) {
+              await new Promise(resolve => setTimeout(resolve, 0));
+            }
+          }
+          
+          // Sort by date
+          indices.sort((a, b) => {
+            const result = a.date.getTime() - b.date.getTime();
+            return preservedSortState.date === 'asc' ? result : -result;
+          });
+          
+          // Update allImageFiles with sorted order
+          allImageFiles = indices.map(item => item.filename);
+          
+          clearProcessingStatus();
+        }
+        
+        // Reapply all filters (this updates filteredImageFiles)
+        filterImages(preservedSearchQuery, null);
+        
+        // Adjust current page if needed (in case filtered results have fewer pages)
+        const totalPages = getTotalPages();
+        if (preservedCurrentPage > totalPages && totalPages > 0) {
+          currentPage = totalPages;
+        } else {
+          currentPage = preservedCurrentPage;
+        }
+        
+        // Update pagination UI with restored page
+        updatePaginationUI();
+        
+        // Load the current page
+        loadCurrentPage(false);
+        
+        // Update image count
+        updateImageCount();
+        
+        // Update image sizes to reflect preserved size multiplier
+        updateImageSizes();
+        
+        // Update the embedded image list in the HTML file to keep it in sync
+        try {
+          const updateResponse = await fetch('/update-embedded-list', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              images: data.images
+            })
+          });
+          
+          if (updateResponse.ok) {
+            debugLog(`[Reload] Updated embedded image list in HTML file`);
+          } else {
+            debugLog(`[Reload] Failed to update embedded image list (non-critical)`);
+          }
+        } catch (updateError) {
+          // Non-critical - if update fails, the app still works with API data
+          debugLog(`[Reload] Could not update embedded image list: ${updateError.message}`);
+        }
         
         // Restart background metadata indexing
         startBackgroundMetadataIndexing();
         
-        debugLog(`[Reload] Reloaded ${data.count} images`);
+        debugLog(`[Reload] Reloaded ${data.count} images and restored user preferences`);
         logToServer('reload_complete', { count: data.count });
         
       } catch (error) {
@@ -5240,6 +5408,17 @@
     // Clear caches on page unload to ensure fresh start on next load
     window.addEventListener('beforeunload', function() {
       clearAllCaches();
+    });
+    
+    // Detect browser refresh and trigger image rescan
+    window.addEventListener('pageshow', function(event) {
+      // If page was loaded from cache (back/forward) or is a refresh
+      // and initial load was already completed, trigger reload
+      if (sessionStorage.getItem('darkroomInitialLoadComplete') === 'true') {
+        // This is a reload/refresh, not initial load
+        // Call reloadImages to rescan for deleted images and other changes
+        reloadImages();
+      }
     });
     
     // Note: Removed visibilitychange handler that was clearing caches on tab switch.
@@ -5352,6 +5531,9 @@
       
       // Start background metadata indexing for model filters
       startBackgroundMetadataIndexing();
+      
+      // Mark that initial load is complete (used to detect browser refresh)
+      sessionStorage.setItem('darkroomInitialLoadComplete', 'true');
 
         // Set up pagination arrow handlers
         const paginationPrev = document.getElementById('paginationPrev');

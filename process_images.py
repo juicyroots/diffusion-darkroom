@@ -413,6 +413,100 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({'error': error_msg}).encode())
                 except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError):
                     pass
+        elif self.path == '/update-embedded-list':
+            try:
+                # Read the request body
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+                
+                image_list = data.get('images', [])
+                
+                if not image_list or not isinstance(image_list, list):
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': 'Missing or invalid images array'}).encode())
+                    return
+                
+                # Get the HTML file path
+                script_dir = os.getcwd()
+                html_file = os.path.join(script_dir, 'darkroom.html')
+                
+                if not os.path.exists(html_file):
+                    error_msg = f'HTML file not found: {html_file}'
+                    print(f"{format_timestamp()} ERROR: {error_msg}", file=sys.stderr)
+                    try:
+                        self.send_response(404)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': error_msg}).encode())
+                    except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError):
+                        pass
+                    return
+                
+                # Read the HTML file
+                try:
+                    with open(html_file, 'r', encoding='utf-8') as f:
+                        html_content = f.read()
+                    
+                    # Generate JavaScript array
+                    js_array = json.dumps(image_list, indent=2)
+                    replacement = f'const embeddedImageList = {js_array};'
+                    
+                    # Find and replace the embedded image list
+                    pattern = r'const embeddedImageList = \[.*?\];'
+                    match = re.search(pattern, html_content, re.DOTALL)
+                    if match:
+                        html_content = html_content[:match.start()] + replacement + html_content[match.end():]
+                        
+                        # Write the updated HTML
+                        with open(html_file, 'w', encoding='utf-8') as f:
+                            f.write(html_content)
+                        
+                        print(f"{format_timestamp()}DARKROOM: Updated embedded image list in {html_file} with {len(image_list)} images", file=sys.stderr)
+                        
+                        try:
+                            self.send_response(200)
+                            self.send_header('Content-type', 'application/json')
+                            self.send_header('Access-Control-Allow-Origin', '*')
+                            self.end_headers()
+                            self.wfile.write(json.dumps({'success': True, 'count': len(image_list)}).encode())
+                        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError):
+                            pass
+                    else:
+                        error_msg = 'Could not find embeddedImageList in HTML file'
+                        print(f"{format_timestamp()} ERROR: {error_msg}", file=sys.stderr)
+                        try:
+                            self.send_response(500)
+                            self.send_header('Content-type', 'application/json')
+                            self.end_headers()
+                            self.wfile.write(json.dumps({'error': error_msg}).encode())
+                        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError):
+                            pass
+                except Exception as e:
+                    error_msg = f'Failed to update HTML file: {str(e)}'
+                    print(f"{format_timestamp()} ERROR: {error_msg}", file=sys.stderr)
+                    try:
+                        self.send_response(500)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': error_msg}).encode())
+                    except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError):
+                        pass
+                    
+            except Exception as e:
+                error_msg = f'Server error: {str(e)}'
+                print(f"{format_timestamp()} ERROR: {error_msg}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+                try:
+                    self.send_response(500)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': error_msg}).encode())
+                except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError):
+                    pass
         else:
             self.send_response(404)
             self.end_headers()
