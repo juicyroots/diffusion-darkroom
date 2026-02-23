@@ -8,18 +8,24 @@
   <title>Diffusion Darkroom
     
   </title>
-  <link rel="icon" type="image/png" href="darkroom.png">
+  <link rel="icon" type="image/png" href="ddr.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   
   <!-- ============================================
-       USER SETTINGS - Edit these values to customize the gallery
+       USER SETTINGS - Edit config.json at project root
        ============================================ -->
+  <script src="/app-config.js"></script>
   <script>
-    // Model Filter Settings
-    // Each model filter has a label (display name) and a containsText (case-insensitive search string)
-    const MODEL_FILTERS = [
+    const DDR_WEB_CONFIG = (
+      window.__DDR_APP_CONFIG__ &&
+      typeof window.__DDR_APP_CONFIG__ === 'object' &&
+      window.__DDR_APP_CONFIG__.web &&
+      typeof window.__DDR_APP_CONFIG__.web === 'object'
+    ) ? window.__DDR_APP_CONFIG__.web : {};
+
+    const DEFAULT_MODEL_FILTERS = [
       { label: 'Flux', containsText: 'flux' },
       { label: 'Qwen', containsText: 'qwen' },
       { label: 'ZIT', containsText: 'z_image' },
@@ -27,28 +33,51 @@
       { label: 'XL', containsText: 'xl' },
       { label: 'Pony', containsText: 'pony' }
     ];
-    
-    // Image Size Slider Settings
+
+    const MODEL_FILTERS = Array.isArray(DDR_WEB_CONFIG.modelFilters) && DDR_WEB_CONFIG.modelFilters.length > 0
+      ? DDR_WEB_CONFIG.modelFilters
+      : DEFAULT_MODEL_FILTERS;
+
+    const DEFAULT_IMAGE_SIZE_SETTINGS = {
+      min: 300,
+      max: 1800,
+      default: 900,
+      step: 0.1
+    };
+
     const IMAGE_SIZE_SETTINGS = {
-      min: 300,        // Minimum image width in pixels
-      max: 1800,       // Maximum image width in pixels
-      default: 600,    // Default image width in pixels
-      step: 0.1        // Step size for slider (multiplier increment)
+      ...DEFAULT_IMAGE_SIZE_SETTINGS,
+      ...(DDR_WEB_CONFIG.imageSize && typeof DDR_WEB_CONFIG.imageSize === 'object' ? DDR_WEB_CONFIG.imageSize : {})
     };
-    
-    // Paging Settings
+
+    const DEFAULT_PAGING_SETTINGS = {
+      options: [50, 100, 250, 500],
+      default: 100
+    };
+
     const PAGING_SETTINGS = {
-      options: [50, 100, 250, 500],  // Available page sizes
-      default: 100                    // Default images per page
+      ...DEFAULT_PAGING_SETTINGS,
+      ...(DDR_WEB_CONFIG.paging && typeof DDR_WEB_CONFIG.paging === 'object' ? DDR_WEB_CONFIG.paging : {})
     };
-    
-    // Lightbox Zoom Settings
+
+    const DEFAULT_ZOOM_SETTINGS = {
+      default: 2.5
+    };
+
     const ZOOM_SETTINGS = {
-      default: 3.5  // Default zoom percentage when clicking and holding (3.0 = 300%)
+      ...DEFAULT_ZOOM_SETTINGS,
+      ...(DDR_WEB_CONFIG.zoom && typeof DDR_WEB_CONFIG.zoom === 'object' ? DDR_WEB_CONFIG.zoom : {})
     };
+
+    const DEBUG_MODE = DDR_WEB_CONFIG.debugMode === true;
   </script>
   
   <style>
+    :root {
+      --ddr-fast-fade: 0.18s;
+      --ddr-fast-ease: cubic-bezier(0.22, 0.06, 0.2, 1);
+    }
+
     html, body {
       margin: 0;
       padding: 0;
@@ -71,9 +100,53 @@
       transition: padding-top 0.3s ease, margin-top 0.3s ease;
       text-align: center;
     }
+    .img-container,
+    .image-wrapper,
+    .image-wrapper img,
+    .filename-label,
+    .image-buttons,
+    .star-button,
+    .delete-button,
+    .rating-stars,
+    .rating-star,
+    .model-filter-btn,
+    .sort-btn,
+    .sort-option-btn,
+    .pagination-page-size-item,
+    .top-nav,
+    .bottom-nav,
+    .bottom-nav-page-size-standalone {
+      transition-duration: var(--ddr-fast-fade) !important;
+      transition-timing-function: var(--ddr-fast-ease) !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .img-container,
+      .image-wrapper,
+      .image-wrapper img,
+      .filename-label,
+      .image-buttons,
+      .star-button,
+      .delete-button,
+      .rating-stars,
+      .rating-star,
+      .model-filter-btn,
+      .sort-btn,
+      .sort-option-btn,
+      .pagination-page-size-item,
+      .top-nav,
+      .bottom-nav,
+      .bottom-nav-page-size-standalone {
+        transition: none !important;
+      }
+    }
     .gallery.top-bar-visible {
-      margin-top: 45px;
-      padding-top: 15px;
+      margin-top: 90px;
+      padding-top: 10px;
+    }
+    body.startup-mode .gallery.top-bar-visible {
+      margin-top: 0;
+      padding-top: 25px;
     }
     .gallery.scrolling {
       cursor: none !important;
@@ -112,6 +185,13 @@
       font-size: 14px;
       color: rgba(255, 255, 255, 0.7);
       font-family: 'Roboto', sans-serif;
+    }
+    .loading-screen-count {
+      font-size: 15px;
+      color: rgba(158, 197, 219, 0.95);
+      font-family: 'Roboto', sans-serif;
+      margin-top: 8px;
+      letter-spacing: 0.3px;
     }
     .loading-screen-progress {
       width: 300px;
@@ -152,6 +232,18 @@
       break-inside: avoid-column;
       /* Prevent layout shifts during loading */
       contain: layout style;
+      transform-origin: center top;
+    }
+    .img-container.masonry-reflow {
+      will-change: transform;
+    }
+    .img-container.removing {
+      overflow: hidden;
+      opacity: 0;
+      transform: scale(0.985);
+      margin-bottom: 0 !important;
+      pointer-events: none;
+      transition: height 0.22s var(--ddr-fast-ease), margin-bottom 0.22s var(--ddr-fast-ease), opacity 0.18s var(--ddr-fast-ease), transform 0.18s var(--ddr-fast-ease) !important;
     }
     .img-container.deleted {
       cursor: default;
@@ -392,7 +484,7 @@
     }
     .delete-button {
       position: absolute;
-      top: 38px;
+      bottom: 35px; /* Align with rating controls above filename label */
       right: 7px;
       width: 22px;
       height: 22px;
@@ -419,6 +511,14 @@
       opacity: 1;
       background: rgba(220, 53, 69, 0.85);
       border-color: rgba(220, 53, 69, 0.8);
+    }
+    .delete-button.armed {
+      opacity: 1;
+      background: rgba(220, 53, 69, 0.88);
+      border-color: rgba(220, 53, 69, 0.92);
+    }
+    .delete-button.armed svg {
+      fill: #fff;
     }
     .delete-button svg {
       width: 14px;
@@ -454,7 +554,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      opacity: 0.5;
+      opacity: 0.72;
       transition: opacity 0.2s, transform 0.1s;
     }
     .rating-star:hover {
@@ -467,7 +567,8 @@
     .rating-star svg {
       width: 16px;
       height: 16px;
-      fill: rgba(128, 128, 128, 0.6); /* Semi-transparent gray when inactive */
+      fill: rgba(168, 178, 196, 0.88); /* Brighter gray for better thumbnail visibility */
+      filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.45));
       transition: fill 0.2s;
     }
     .rating-star.active svg {
@@ -598,7 +699,7 @@
     }
     /* ---- Lightbox ---- */
     .lightbox-overlay {
-      display: none;
+      display: flex;
       position: fixed;
       z-index: 99999;
       left: 0; top: 0;
@@ -608,9 +709,15 @@
       justify-content: center;
       align-items: center;
       cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.2s var(--ddr-fast-ease), visibility 0.2s var(--ddr-fast-ease);
     }
     .lightbox-overlay.active {
-      display: flex;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
     }
     .lightbox-overlay.hide-cursor {
       cursor: none !important;
@@ -636,7 +743,13 @@
       box-shadow: 0 2px 32px #000;
       z-index: 10;
       pointer-events: auto;
-      transition: transform 0.2s ease-out;
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+      transition: transform 0.2s var(--ddr-fast-ease), opacity 0.2s var(--ddr-fast-ease);
+    }
+    .lightbox-overlay.active .lightbox-img {
+      opacity: 1;
+      transform: translateY(0) scale(1);
     }
     .lightbox-img.zoomed {
       transition: none;
@@ -961,31 +1074,42 @@
       background: rgba(255, 255, 255, 0.2);
       border-color: rgba(255, 255, 255, 0.4);
     }
-    /* ---- Search Bar ---- */
+    /* ---- Refactored Top Navigation ---- */
     .top-nav {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      height: 48px;
-      background: rgba(20, 20, 20, 0.95);
+      height: 86px;
+      background: linear-gradient(90deg, rgba(14, 20, 30, 0.94), rgba(17, 26, 39, 0.97));
       backdrop-filter: blur(8px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      align-items: center;
-      padding: 0 20px;
-      z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+      display: grid;
+      grid-template-rows: 52px 34px;
+      z-index: 3000;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
       transform: translateY(-100%);
       opacity: 0;
       transition: transform 0.3s ease, opacity 0.3s ease;
       pointer-events: none;
       will-change: transform, opacity;
+      overflow: visible;
+    }
+    body.startup-mode .top-nav {
+      display: none;
     }
     .top-nav.visible {
       transform: translateY(0);
       opacity: 1;
       pointer-events: auto;
+    }
+    .top-nav-main {
+      position: relative;
+      height: 52px;
+      padding: 0 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
     .image-count {
       color: rgba(255, 255, 255, 0.5);
@@ -1001,17 +1125,17 @@
       position: relative;
       display: flex;
       align-items: center;
-      width: 150px;
-      max-width: 150px;
+      width: 120px;
+      max-width: 120px;
       flex-shrink: 0;
     }
     .search-input {
       width: 100%;
       height: 26px;
       padding: 0 26px 0 10px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
+      background: #0c121a;
+      border: 1px solid #273243;
+      border-radius: 6px;
       color: #fff;
       font-size: 12px;
       font-family: 'Roboto', sans-serif;
@@ -1020,9 +1144,9 @@
       box-sizing: border-box;
     }
     .search-input:focus {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.4);
-      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+      background: #101826;
+      border-color: #4f78b8;
+      box-shadow: 0 0 0 2px rgba(122, 168, 255, 0.18);
     }
     .search-input::placeholder {
       color: rgba(255, 255, 255, 0.5);
@@ -1058,60 +1182,160 @@
     .search-sort-container {
       position: absolute;
       left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 2;
-    }
-    /* ---- Sort Buttons ---- */
-    .sort-buttons {
+      top: 50%;
+      transform: translate(-50%, -50%);
       display: flex;
       align-items: center;
       gap: 8px;
+      z-index: 6;
+    }
+    /* ---- Compact Sort Control ---- */
+    .sort-control {
+      position: relative;
       flex-shrink: 0;
+    }
+    .sort-compact-btn {
+      height: 26px;
+      min-width: 132px;
+      border-radius: 6px;
+      background: #090f18;
+      border: 1px solid #273243;
+      color: #d8e2f0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 8px;
+      transition: all 0.2s;
+      font-size: 11px;
+      font-family: 'Roboto', sans-serif;
+      white-space: nowrap;
+    }
+    .sort-compact-btn:hover {
+      background: #253447;
+      border-color: #4d6996;
+    }
+    .sort-compact-btn.active {
+      background: rgba(109, 145, 189, 0.22);
+      border-color: rgba(140, 178, 224, 0.58);
+      box-shadow: inset 0 0 0 1px rgba(176, 208, 244, 0.22);
+    }
+    .sort-caret {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 10px;
+      line-height: 1;
+      transform: translateY(1px);
+    }
+    .sort-popover {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 200px;
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(16, 18, 24, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      z-index: 4000;
+      display: none;
+    }
+    .sort-popover.open {
+      display: block;
+    }
+    .sort-popover-title {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.55);
+      margin: 0 0 6px;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+    }
+    .sort-options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .sort-dir-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .sort-refresh-row {
+      margin-top: 8px;
+    }
+    .sort-option-btn {
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.82);
+      cursor: pointer;
+      font-size: 11px;
+      font-family: 'Roboto', sans-serif;
+      transition: all 0.2s;
+      padding: 0 7px;
+      text-align: left;
+    }
+    .sort-option-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    .sort-option-btn.active {
+      background: rgba(108, 149, 201, 0.34);
+      border-color: rgba(151, 191, 238, 0.78);
+      color: #f7fbff;
+      box-shadow: inset 0 0 0 1px rgba(197, 224, 255, 0.22);
+    }
+    .sort-refresh-btn {
+      width: 100%;
+      text-align: center;
     }
     /* ---- Rating Filter Stars ---- */
     .rating-filter-stars {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
       flex-shrink: 0;
-      margin-left: 8px;
+      margin-left: 0;
+      margin-right: 25px;
     }
     .rating-filter-star {
-      width: 18px;
-      height: 18px;
-      background: transparent;
-      border: none;
+      width: 26px;
+      height: 26px;
+      background: #090f18;
+      border: 1px solid #273243;
+      border-radius: 6px;
       cursor: pointer;
       padding: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      opacity: 0.6;
-      transition: opacity 0.2s, transform 0.1s;
+      opacity: 1;
+      transition: background 0.2s, border-color 0.2s, transform 0.1s;
     }
     .rating-filter-star:hover {
-      opacity: 1;
-      transform: scale(1.1);
+      background: #253447;
+      border-color: #4d6996;
+      transform: translateY(-1px);
     }
     .rating-filter-star.active {
-      opacity: 1;
+      background: #090f18;
+      border-color: #273243;
     }
     .rating-filter-star svg {
-      width: 18px;
-      height: 18px;
-      fill: rgba(128, 128, 128, 0.6); /* Gray when inactive */
+      width: 13px;
+      height: 13px;
+      fill: rgba(142, 160, 184, 0.7);
       stroke: rgba(255, 255, 255, 0.3);
       stroke-width: 0.5px;
       transition: fill 0.2s, stroke 0.2s;
     }
     .rating-filter-star.active svg {
-      fill: #ffd700; /* Gold when active */
+      fill: #77b4ff;
     }
     .rating-filter-star:hover svg {
-      fill: #ffed4e;
+      fill: #9fc8ff;
     }
     .rating-filter-star::after {
       content: attr(data-label);
@@ -1139,38 +1363,46 @@
     .right-buttons {
       position: absolute;
       right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-shrink: 0;
-      z-index: 2;
+      z-index: 6;
     }
     /* ---- Model Filter Buttons ---- */
     .model-filters {
       position: absolute;
       left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
       display: flex;
       align-items: center;
-      gap: 5px;
-      z-index: 2;
+      gap: 4px;
+      z-index: 6;
     }
     .model-filter-btn {
-      padding: 3px 7px;
-      border-radius: 4px;
-      background: #2a2a2a;
-      border: none;
-      color: gray;
+      height: 26px;
+      min-width: 26px;
+      padding: 0 6px;
+      border-radius: 6px;
+      background: #090f18;
+      border: 1px solid #273243;
+      color: #d8e2f0;
       cursor: pointer;
       font-family: 'Roboto', sans-serif;
       font-size: 11px;
       transition: all 0.2s;
     }
     .model-filter-btn:hover {
-      background: #3a3a3a;
-      color: #aaa;
+      background: #253447;
+      border-color: #4d6996;
+      color: #eef4ff;
     }
     .model-filter-btn.active {
-      background: #3f5364;
+      background: #2f4463;
+      border-color: #4d6996;
       color: #fff;
     }
     .model-filter-btn:disabled {
@@ -1212,44 +1444,45 @@
       align-items: center;
     }
     .sort-btn {
-      width: 24px;
-      height: 24px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: rgba(255, 255, 255, 0.6);
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: #090f18;
+      border: 1px solid #273243;
+      color: #d8e2f0;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 0;
       transition: all 0.2s;
-      font-size: 10px;
+      font-size: 12px;
     }
     .sort-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.4);
-      color: rgba(255, 255, 255, 0.9);
+      background: #253447;
+      border-color: #4d6996;
+      color: #eef4ff;
     }
     .sort-btn.active {
-      background: rgba(255, 255, 255, 0.25);
-      border-color: rgba(255, 255, 255, 0.5);
-      color: rgba(255, 255, 255, 1);
+      background: #2f4463;
+      border-color: #4d6996;
+      color: #fff;
     }
     .sort-btn.favorites-active {
-      background: rgba(255, 193, 7, 0.3);
-      border-color: rgba(255, 193, 7, 0.6);
+      background: #090f18;
+      border-color: #273243;
     }
     .sort-btn.favorites-active svg {
-      fill: #ffc107;
+      fill: #ff2a2a;
     }
     .sort-btn svg {
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
       fill: currentColor;
     }
     #favoritesFilter {
       position: relative;
+      margin-right: 25px;
     }
     #favoritesFilter::after {
       content: 'Toggle Favorites';
@@ -1275,12 +1508,12 @@
     }
     /* ---- Reload Button ---- */
     .reload-btn {
-      width: 24px;
-      height: 24px;
-      border-radius: 4px;
-      background: rgba(60, 60, 60, 0.8);
-      border: 1px solid rgba(80, 80, 80, 0.6);
-      color: rgba(255, 255, 255, 0.6);
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: #1a2331;
+      border: 1px solid #273243;
+      color: #d8e2f0;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -1290,9 +1523,9 @@
       flex-shrink: 0;
     }
     .reload-btn:hover {
-      background: rgba(80, 80, 80, 0.9);
-      border-color: rgba(100, 100, 100, 0.8);
-      color: rgba(255, 255, 255, 0.9);
+      background: #253447;
+      border-color: #4d6996;
+      color: #eef4ff;
     }
     .reload-btn:active {
       transform: scale(0.95);
@@ -1302,12 +1535,37 @@
       animation: pulse 1.5s ease-in-out infinite;
     }
     .reload-btn svg {
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
       fill: currentColor;
     }
     .reload-btn.loading svg {
       animation: spin 1s linear infinite;
+    }
+    .folder-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: #1a2331;
+      border: 1px solid #273243;
+      color: #d8e2f0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .folder-btn:hover {
+      background: #253447;
+      border-color: #4d6996;
+      color: #eef4ff;
+    }
+    .folder-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
     }
     @keyframes pulse {
       0%, 100% {
@@ -1325,22 +1583,26 @@
     }
     /* ---- Size Control Slider ---- */
     .size-control {
-      position: absolute;
-      left: 30%;
-      transform: translateX(-50%);
+      position: relative;
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-      width: 126px;
-      max-width: 126px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 15px calc(42px + var(--ddr-scrollbar-inset, 0px)) 16px 14px;
+      background: #03070f;
       z-index: 2;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+      border-top: 1px solid rgba(165, 176, 196, 0.25);
+      overflow: hidden;
     }
     .size-slider-container {
       position: relative;
-      flex: 1;
+      width: 100%;
+      box-sizing: border-box;
       display: flex;
       align-items: center;
+      padding-right: 8px;
     }
     .size-slider-width-popup {
       position: absolute;
@@ -1366,9 +1628,13 @@
     }
     .size-slider {
       width: 100%;
-      height: 3px;
-      border-radius: 1.5px;
-      background: rgba(255, 255, 255, 0.15);
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(
+        to right,
+        #5e9fff 0 var(--ddr-slider-fill, 0%),
+        #121a28 var(--ddr-slider-fill, 0%) 100%
+      );
       outline: none;
       -webkit-appearance: none;
       appearance: none;
@@ -1376,45 +1642,106 @@
       transition: background 0.2s;
       border: none;
     }
+    .size-slider::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(
+        to right,
+        #5e9fff 0 var(--ddr-slider-fill, 0%),
+        #121a28 var(--ddr-slider-fill, 0%) 100%
+      );
+      border: none;
+    }
+    .size-slider::-moz-range-track {
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(
+        to right,
+        #5e9fff 0 var(--ddr-slider-fill, 0%),
+        #121a28 var(--ddr-slider-fill, 0%) 100%
+      );
+      border: none;
+    }
     .size-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px;
+      width: 28px;
       height: 16px;
-      border-radius: 4px;
-      background: #3f5364;
-      border: none;
+      margin-top: -6px;
+      border-radius: 8px;
+      background: #5e9fff;
+      border: 2px solid #9ebee5;
       cursor: pointer;
       transition: all 0.2s;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
     }
     .size-slider::-webkit-slider-thumb:hover {
-      background: #4a6278;
-      transform: scale(1.1);
-      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+      background: #77afff;
+      transform: scale(1.05);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
     }
     .size-slider::-webkit-slider-thumb:active {
-      background: #3f5364;
-      transform: scale(1.05);
+      background: #5e9fff;
+      transform: scale(1.03);
     }
     .size-slider::-moz-range-thumb {
-      width: 16px;
+      width: 28px;
       height: 16px;
-      border-radius: 4px;
-      background: #3f5364;
-      border: none;
+      border-radius: 8px;
+      background: #5e9fff;
+      border: 2px solid #9ebee5;
       cursor: pointer;
       transition: all 0.2s;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
     }
     .size-slider::-moz-range-thumb:hover {
-      background: #4a6278;
-      transform: scale(1.1);
-      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+      background: #77afff;
+      transform: scale(1.05);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
     }
     .size-slider::-moz-range-thumb:active {
-      background: #3f5364;
-      transform: scale(1.05);
+      background: #5e9fff;
+      transform: scale(1.03);
+    }
+    .startup-landing {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 18px;
+      background: #000;
+      z-index: 1001;
+    }
+    .startup-landing.visible {
+      display: flex;
+    }
+    .startup-title {
+      color: rgba(54, 60, 70, 0.45);
+      font-size: 80px;
+      font-weight: 500;
+      letter-spacing: 0.6px;
+      text-transform: lowercase;
+    }
+    .startup-select-btn {
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid #4d6996;
+      background: #2f4463;
+      color: #e8f0ff;
+      padding: 0 16px;
+      font-size: 13px;
+      font-family: 'Roboto', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    }
+    .startup-select-btn:hover {
+      background: #3a5276;
+      border-color: #5f7fb4;
+    }
+    .startup-select-btn:active {
+      transform: translateY(1px);
     }
     /* ---- Loading Bar ---- */
     .loading-bar-container {
@@ -1455,15 +1782,16 @@
       bottom: 0;
       left: 0;
       right: 0;
-      height: 40px;
+      min-height: 40px;
       background: rgba(20, 20, 20, 0.95);
       backdrop-filter: blur(8px);
       border-top: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
-      justify-content: space-between;
       gap: 10px;
-      padding: 0 12px;
+      padding: 4px 12px 6px;
+      box-sizing: border-box;
       z-index: 1000;
       box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
       transform: translateY(100%);
@@ -1483,7 +1811,8 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      flex-shrink: 0;
+      min-width: 0;
+      overflow: hidden;
     }
     .processing-indicator {
       width: 10px;
@@ -1511,15 +1840,16 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      flex: 1;
       justify-content: center;
-      min-width: 0;
+      min-width: max-content;
+      justify-self: center;
     }
     .bottom-nav-right {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-shrink: 0;
+      justify-self: end;
+      min-width: max-content;
     }
     .pagination-arrow {
       width: 28px;
@@ -1599,7 +1929,7 @@
     }
     .pagination-page-size-item {
       position: relative;
-      font-size: 11px;
+      font-size: 13px;
       font-family: 'Roboto', sans-serif;
       color: rgba(255, 255, 255, 0.6);
       cursor: pointer;
@@ -1648,14 +1978,15 @@
       position: fixed;
       bottom: 0;
       right: 0;
-      height: 40px;
+      min-height: 40px;
       background: rgba(20, 20, 20, 0.95);
       backdrop-filter: blur(8px);
       border-top: 1px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding: 0 12px;
+      padding: 4px 12px 6px;
+      box-sizing: border-box;
       z-index: 1000;
       box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
       transform: translateY(100%);
@@ -1675,9 +2006,60 @@
 </head>
 <body>
   <div class="top-nav">
-    <div class="model-filters" id="modelFilters">
-      <!-- Model filter buttons will be generated from MODEL_FILTERS settings -->
-      <span class="model-filters-status"></span>
+    <div class="top-nav-main">
+      <div class="model-filters" id="modelFilters">
+        <!-- Model filter buttons will be generated from MODEL_FILTERS settings -->
+        <span class="model-filters-status"></span>
+      </div>
+      <div class="search-sort-container">
+        <div class="search-wrapper">
+          <input type="text" class="search-input" id="searchInput" />
+          <button class="search-clear" id="searchClear" aria-label="Clear search">×</button>
+        </div>
+        <div class="sort-control" id="sortControl">
+          <button class="sort-compact-btn" id="sortControlBtn" title="Sorting options">
+            <span id="sortControlLabel">Sort: Filename ↑</span>
+            <span class="sort-caret">▾</span>
+          </button>
+          <div class="sort-popover" id="sortPopover">
+            <div class="sort-popover-title">Sort By</div>
+            <div class="sort-options-grid">
+              <button class="sort-option-btn" data-sort-field="filename">Filename</button>
+              <button class="sort-option-btn" data-sort-field="date">Date</button>
+              <button class="sort-option-btn" data-sort-field="stars">Stars</button>
+              <button class="sort-option-btn" data-sort-field="favorites">Favorites</button>
+            </div>
+            <div class="sort-popover-title">Direction</div>
+            <div class="sort-dir-row">
+              <button class="sort-option-btn" data-sort-direction="asc">Ascending</button>
+              <button class="sort-option-btn" data-sort-direction="desc">Descending</button>
+            </div>
+            <div class="sort-refresh-row">
+              <button class="sort-option-btn sort-refresh-btn" id="sortRefreshBtn">Refresh Current Sort</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="right-buttons">
+        <div class="rating-filter-stars" id="ratingFilterStars">
+          <!-- Rating filter stars will be added here -->
+        </div>
+        <button class="sort-btn" id="favoritesFilter" title="Show favorites only">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+        </button>
+        <button class="folder-btn" id="changeFolderBtn" title="Change Folder">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M10 4l2 2h8c1.1 0 2 .9 2 2v2h-2V8h-8.83l-2-2H4v12h7v2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h6zm7 8l5 4-5 4v-3h-6v-2h6v-3z"/>
+          </svg>
+        </button>
+        <button class="reload-btn" id="reloadBtn" title="Rescan folders and reload images">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="size-control">
       <div class="size-slider-container">
@@ -1690,39 +2072,10 @@
         <div class="size-slider-width-popup" id="sizeSliderWidthPopup"></div>
       </div>
     </div>
-    <div class="search-sort-container">
-      <div class="search-wrapper">
-        <input type="text" class="search-input" id="searchInput" />
-        <button class="search-clear" id="searchClear" aria-label="Clear search">×</button>
-      </div>
-      <div class="sort-buttons">
-        <button class="sort-btn" id="sortFilename" title="Sort by filename">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M7 10l5 5 5-5z"/>
-          </svg>
-        </button>
-        <button class="sort-btn" id="sortDate" title="Sort by date">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>
-          </svg>
-        </button>
-      </div>
-      <div class="rating-filter-stars" id="ratingFilterStars">
-        <!-- Rating filter stars will be added here -->
-      </div>
-    </div>
-    <div class="right-buttons">
-      <button class="sort-btn" id="favoritesFilter" title="Show favorites only">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-      </button>
-      <button class="reload-btn" id="reloadBtn" title="Rescan folders and reload images">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-        </svg>
-      </button>
-    </div>
+  </div>
+  <div class="startup-landing" id="startupLanding">
+    <div class="startup-title">diffusion darkroom</div>
+    <button class="startup-select-btn" id="startupSelectFolder">Select Folder</button>
   </div>
   <div class="loading-screen" id="loadingScreen">
     <div class="loading-screen-content">
@@ -1731,6 +2084,7 @@
       <div class="loading-screen-progress">
         <div class="loading-screen-progress-fill" id="loadingScreenProgress"></div>
       </div>
+      <div class="loading-screen-count" id="loadingScreenImageCount">0 Images</div>
     </div>
   </div>
   <div class="gallery" id="gallery"></div>
@@ -1823,7 +2177,7 @@
   </div>
   <script>
     // Production debug flag - set to false to disable debug logging
-    const DEBUG_MODE = false; // Set to true for debugging
+    // DEBUG_MODE is sourced from config.json (web.debugMode).
     
     // Debug logging helper
     function debugLog(...args) {
@@ -1848,25 +2202,36 @@
       return scrollbarWidth;
     }
     
-    // Apply scrollbar width to top nav and bottom nav bars
-    window.addEventListener('DOMContentLoaded', function() {
-      const scrollbarWidth = getScrollbarWidth();
+    // Apply scrollbar width offsets so fixed bars never sit under the browser scrollbar.
+    function applyScrollbarInsets() {
+      const measured = getScrollbarWidth();
+      const viewportDelta = window.innerWidth - document.documentElement.clientWidth;
+      const scrollbarWidth = Math.max(measured, viewportDelta, 0);
       const topNav = document.querySelector('.top-nav');
       const bottomNav = document.querySelector('.bottom-nav');
       const pageSizeStandalone = document.getElementById('bottomNavPageSizeStandalone');
-      if (topNav && scrollbarWidth > 0) {
-        // Add 2px buffer to prevent bleeding into scrollbar
-        topNav.style.right = `${scrollbarWidth + 2}px`;
+      const rightInset = scrollbarWidth > 0 ? `${scrollbarWidth + 2}px` : '0px';
+      document.documentElement.style.setProperty('--ddr-scrollbar-inset', rightInset);
+
+      if (topNav) {
+        topNav.style.right = rightInset;
       }
-      if (bottomNav && scrollbarWidth > 0) {
-        // Add 2px buffer to prevent bleeding into scrollbar
-        bottomNav.style.right = `${scrollbarWidth + 2}px`;
+      if (bottomNav) {
+        bottomNav.style.right = rightInset;
       }
-      if (pageSizeStandalone && scrollbarWidth > 0) {
-        // Add 2px buffer to prevent bleeding into scrollbar
-        pageSizeStandalone.style.right = `${scrollbarWidth + 2}px`;
+      if (pageSizeStandalone) {
+        pageSizeStandalone.style.right = rightInset;
       }
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+      applyScrollbarInsets();
+      // Re-apply after layout settles and content height changes.
+      setTimeout(applyScrollbarInsets, 50);
+      setTimeout(applyScrollbarInsets, 250);
     });
+    window.addEventListener('resize', applyScrollbarInsets);
+    window.addEventListener('load', applyScrollbarInsets);
     
     // Rating helper functions
     function parseRatingFromFilename(filename) {
@@ -1942,7 +2307,41 @@
       // Extract just the filename from a path (handles both / and \)
       return path.split(/[/\\]/).pop();
     }
+    function getPathSortKey(path) {
+      // Keep filename sort deterministic across folders and OS separators.
+      return String(path || '').replace(/\\/g, '/').toLowerCase();
+    }
+    async function copyTextRobust(text) {
+      const value = String(text || '');
+      if (!value) return false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(value);
+          return true;
+        }
+      } catch (e) {}
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return !!ok;
+      } catch (e) {
+        return false;
+      }
+    }
     async function showLightbox(src, filename, index = -1) {
+      // Resolve using the clicked filename itself; don't use stale lightbox datasets here.
+      filename = resolveCurrentFilename(filename);
+      src = escapeFilename(filename);
+
       // Store scroll position before opening lightbox
       scrollPositionBeforeLightbox = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
       
@@ -1970,7 +2369,10 @@
       img.src = src;
       const baseFilename = removeExtension(getFilenameOnly(filename));
       label.textContent = baseFilename; // Will be updated when metadata loads
-      lightbox.classList.add('active');
+      lightbox.classList.remove('closing');
+      requestAnimationFrame(() => {
+        lightbox.classList.add('active');
+      });
       
       // Update navigation arrows visibility
       updateNavArrows();
@@ -2030,6 +2432,7 @@
           lightboxStarButton.setAttribute('title', 'Add to favorites');
         }
         lightboxStarButton.dataset.filename = filename;
+        lightboxStarButton.dataset.imageId = getImageIdForPath(filename) || '';
       }
       
       // Update lightbox rating stars
@@ -2038,6 +2441,7 @@
         // Clear existing stars
         lightboxRatingContainer.innerHTML = '';
         lightboxRatingContainer.dataset.filename = filename;
+        lightboxRatingContainer.dataset.imageId = getImageIdForPath(filename) || '';
         
         // Get current rating
         const currentRating = parseRatingFromFilename(filename);
@@ -2057,10 +2461,15 @@
           star.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            const currentFilename = lightboxRatingContainer.dataset.filename || filename;
+            const currentFilename = resolveCurrentFilename(
+              lightboxRatingContainer.dataset.filename || filename,
+              lightboxRatingContainer
+            );
+            const currentImageId = lightboxRatingContainer.dataset.imageId || getImageIdForPath(currentFilename);
             // Find the container for this image
             const containers = Array.from(document.querySelectorAll('.img-container'));
             const matchingContainer = containers.find(c => {
+              if (currentImageId && c.dataset.imageId === currentImageId) return true;
               const cFilename = c.dataset.filename || c.dataset.currentFilename;
               return cFilename === currentFilename;
             });
@@ -2094,6 +2503,10 @@
       }
     }
     function hideLightbox() {
+      const lightboxEl = document.getElementById('lightbox');
+      if (!lightboxEl || !lightboxEl.classList.contains('active')) {
+        return;
+      }
       const img = document.getElementById('lightboxImg');
       zoomActive = false;
       isPanning = false;
@@ -2103,10 +2516,14 @@
       img.style.transformOrigin = 'center center';
       img.style.width = '';
       img.style.height = '';
-      img.src = '';
-      document.getElementById('lightbox').classList.remove('active');
-      document.getElementById('lightbox').classList.remove('hide-cursor');
+      lightboxEl.classList.add('closing');
+      lightboxEl.classList.remove('active');
+      lightboxEl.classList.remove('hide-cursor');
       currentLightboxIndex = -1;
+      setTimeout(() => {
+        img.src = '';
+        lightboxEl.classList.remove('closing');
+      }, 210);
       
       // Restore scroll position after closing lightbox
       if (scrollPositionBeforeLightbox > 0) {
@@ -2118,16 +2535,6 @@
           if (document.body.scrollTop !== undefined) {
             document.body.scrollTop = scrollPositionBeforeLightbox;
           }
-          // Also restore after a brief delay to ensure it sticks
-          setTimeout(() => {
-            window.scrollTo(0, scrollPositionBeforeLightbox);
-            if (document.documentElement.scrollTop !== undefined) {
-              document.documentElement.scrollTop = scrollPositionBeforeLightbox;
-            }
-            if (document.body.scrollTop !== undefined) {
-              document.body.scrollTop = scrollPositionBeforeLightbox;
-            }
-          }, 10);
         });
       }
       
@@ -2167,7 +2574,18 @@
     
     function navigateLightbox(direction) {
       if (currentLightboxIndex < 0) {
-        return;
+        // Try to recover index from the currently displayed lightbox filename.
+        const lightboxStarBtn = document.getElementById('lightboxStarButton');
+        const currentFilename = resolveCurrentFilename(lightboxStarBtn?.dataset?.filename || '');
+        if (currentFilename) {
+          currentLightboxIndex = filteredImageFiles.findIndex(f => f === currentFilename);
+          if (currentLightboxIndex === -1) {
+            currentLightboxIndex = allImageFiles.findIndex(f => f === currentFilename);
+          }
+        }
+        if (currentLightboxIndex < 0) {
+          return;
+        }
       }
       
       if (isNavigating) {
@@ -2214,6 +2632,7 @@
             lightboxStarButton.setAttribute('title', 'Add to favorites');
           }
           lightboxStarButton.dataset.filename = filename;
+          lightboxStarButton.dataset.imageId = getImageIdForPath(filename) || '';
         }
         
         // Update lightbox rating stars
@@ -2222,13 +2641,15 @@
           const currentRating = parseRatingFromFilename(filename);
           updateRatingDisplay(lightboxRatingContainer, currentRating);
           lightboxRatingContainer.dataset.filename = filename;
+          lightboxRatingContainer.dataset.imageId = getImageIdForPath(filename) || '';
         }
       }, 100);
       
-      // Reset flag after a short delay to allow navigation to complete
+      // Reset the navigation lock shortly after rendering starts.
+      // Keeping this brief avoids "double-click required" behavior.
       setTimeout(() => {
         isNavigating = false;
-      }, 150);
+      }, 60);
     }
     let allImageContainers = [];
     let allImageFiles = [];
@@ -2242,13 +2663,17 @@
     let isNavigating = false; // Flag to prevent closing during navigation
     let scrollPositionBeforeLightbox = 0; // Store scroll position before opening lightbox
     let sortState = {
-      filename: null, // null, 'asc', 'desc'
-      date: null
+      field: 'filename', // 'filename', 'date', 'stars', 'favorites'
+      direction: 'asc' // 'asc', 'desc'
     };
     let showFavoritesOnly = false; // Track favorites filter state
     let activeModelFilter = null; // Track active model filter: 'flux', 'xl', 'pony', or null
     let activeRatingFilters = new Set(); // Track active rating filters: Set of numbers 1-5
     let favoriteOriginalPaths = new Map(); // Track original paths of favorited images: filename -> originalPath (in-memory cache)
+    let imageIdToPath = new Map(); // imageId -> current path
+    let pathToImageId = new Map(); // current path -> imageId
+    let imageIdCounter = 1;
+    let currentBaseFolder = '';
     const HISTORY_STORAGE_KEY = 'favoritesHistory'; // localStorage key for history
     
     // Load favorites history from localStorage
@@ -2302,11 +2727,215 @@
     function getOriginalPathFromHistory(favoritesPath) {
       return favoriteOriginalPaths.get(favoritesPath) || null;
     }
+    function normalizeImagePath(path) {
+      return (path || '').replace(/\\/g, '/');
+    }
+
+    // Resolve latest path after file moves/renames.
+    function resolveCurrentFilename(filename, ...elements) {
+      let candidate = normalizeImagePath(filename);
+
+      if (candidate && (allImageFiles.includes(candidate) || filteredImageFiles.includes(candidate))) {
+        return candidate;
+      }
+
+      for (const el of elements) {
+        if (!el || !el.dataset) continue;
+        const imageId = el.dataset.imageId;
+        if (imageId && imageIdToPath.has(imageId)) {
+          return imageIdToPath.get(imageId);
+        }
+        const dataPath = normalizeImagePath(el.dataset.filename || el.dataset.currentFilename || '');
+        if (!candidate && dataPath) {
+          candidate = dataPath;
+          break;
+        }
+      }
+
+      if (candidate && (allImageFiles.includes(candidate) || filteredImageFiles.includes(candidate))) {
+        return candidate;
+      }
+
+      const baseName = getFilenameOnly(candidate);
+      if (baseName) {
+        const resolved = allImageFiles.find(f => getFilenameOnly(f) === baseName) ||
+                         filteredImageFiles.find(f => getFilenameOnly(f) === baseName);
+        if (resolved) return resolved;
+      }
+
+      return candidate;
+    }
+
+    function restoreScrollPositionStable(targetY) {
+      const y = Math.max(0, Number(targetY) || 0);
+      const apply = () => {
+        window.scrollTo(0, y);
+        if (document.documentElement.scrollTop !== undefined) {
+          document.documentElement.scrollTop = y;
+        }
+        if (document.body.scrollTop !== undefined) {
+          document.body.scrollTop = y;
+        }
+      };
+      apply();
+      requestAnimationFrame(apply);
+      setTimeout(apply, 40);
+      setTimeout(apply, 120);
+      setTimeout(apply, 260);
+    }
+
+    function getContainerIdentity(container) {
+      if (!container) return '';
+      return container.dataset.imageId || container.dataset.filename || container.dataset.currentFilename || '';
+    }
+
+    function captureContainerPositions(containers) {
+      const positions = new Map();
+      (containers || []).forEach((container) => {
+        if (!container || !container.isConnected) return;
+        const key = getContainerIdentity(container);
+        if (!key) return;
+        positions.set(key, container.getBoundingClientRect());
+      });
+      return positions;
+    }
+
+    function animateContainerRemoval(container) {
+      if (!container) return Promise.resolve();
+      const startHeight = Math.max(container.offsetHeight, 1);
+      container.style.height = `${startHeight}px`;
+      container.style.maxHeight = `${startHeight}px`;
+      container.style.minHeight = '0px';
+      void container.offsetHeight;
+      container.classList.add('removing');
+      container.style.height = '0px';
+      container.style.maxHeight = '0px';
+      container.style.marginBottom = '0px';
+      return new Promise((resolve) => setTimeout(resolve, 220));
+    }
+
+    function animateMasonryReflowFrom(previousPositions) {
+      if (!(previousPositions instanceof Map) || previousPositions.size === 0) return;
+      const duration = 220;
+      allImageContainers.forEach((container) => {
+        if (!container || !container.isConnected) return;
+        const key = getContainerIdentity(container);
+        if (!key) return;
+        const beforeRect = previousPositions.get(key);
+        if (!beforeRect) return;
+        const afterRect = container.getBoundingClientRect();
+        const deltaX = beforeRect.left - afterRect.left;
+        const deltaY = beforeRect.top - afterRect.top;
+        if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+        container.classList.add('masonry-reflow');
+        container.style.transition = 'none';
+        container.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        requestAnimationFrame(() => {
+          container.style.transition = `transform ${duration}ms var(--ddr-fast-ease)`;
+          container.style.transform = 'translate(0, 0)';
+        });
+        setTimeout(() => {
+          container.style.transition = '';
+          container.style.transform = '';
+          container.classList.remove('masonry-reflow');
+        }, duration + 40);
+      });
+    }
+
+    function ensureImageIdForPath(path) {
+      const normalized = normalizeImagePath(path);
+      if (!normalized) return null;
+      if (pathToImageId.has(normalized)) {
+        return pathToImageId.get(normalized);
+      }
+      const id = `img_${imageIdCounter++}`;
+      pathToImageId.set(normalized, id);
+      imageIdToPath.set(id, normalized);
+      return id;
+    }
+
+    function getImageIdForPath(path) {
+      const normalized = normalizeImagePath(path);
+      return normalized ? pathToImageId.get(normalized) || null : null;
+    }
+
+    function updateImagePathById(oldPath, newPath) {
+      const oldNorm = normalizeImagePath(oldPath);
+      const newNorm = normalizeImagePath(newPath);
+      if (!newNorm) return null;
+
+      let id = oldNorm ? pathToImageId.get(oldNorm) : null;
+      if (!id) id = ensureImageIdForPath(newNorm);
+      if (!id) return null;
+
+      if (oldNorm) pathToImageId.delete(oldNorm);
+      pathToImageId.set(newNorm, id);
+      imageIdToPath.set(id, newNorm);
+      return id;
+    }
+
+    function rebuildImageIdentityMaps(imageList) {
+      const previousPathToId = new Map(pathToImageId);
+      const previousIdToPath = new Map(imageIdToPath);
+      pathToImageId = new Map();
+      imageIdToPath = new Map();
+
+      imageList.forEach(path => {
+        const normalized = normalizeImagePath(path);
+        if (!normalized) return;
+        const existingId = previousPathToId.get(normalized);
+        if (existingId) {
+          pathToImageId.set(normalized, existingId);
+          imageIdToPath.set(existingId, normalized);
+        } else {
+          let reused = null;
+          const baseName = getFilenameOnly(normalized);
+          if (baseName) {
+            for (const [id, oldPath] of previousIdToPath.entries()) {
+              if (getFilenameOnly(oldPath) === baseName && !imageIdToPath.has(id)) {
+                reused = id;
+                break;
+              }
+            }
+          }
+          const id = reused || `img_${imageIdCounter++}`;
+          pathToImageId.set(normalized, id);
+          imageIdToPath.set(id, normalized);
+        }
+      });
+    }
+
+    function removeMissingImageFromState(filename) {
+      const normalized = normalizeImagePath(filename);
+      if (!normalized) return false;
+      const staleId = pathToImageId.get(normalized);
+
+      let removed = false;
+      const indexInAll = allImageFiles.indexOf(normalized);
+      if (indexInAll !== -1) {
+        allImageFiles.splice(indexInAll, 1);
+        removed = true;
+      }
+
+      const indexInFiltered = filteredImageFiles.indexOf(normalized);
+      if (indexInFiltered !== -1) {
+        filteredImageFiles.splice(indexInFiltered, 1);
+        removed = true;
+      }
+
+      imageSearchIndex.delete(normalized);
+      imageDimensionsCache.delete(normalized);
+      imageDates.delete(normalized);
+      imageMetadataCache.delete(normalized);
+      pathToImageId.delete(normalized);
+      if (staleId) imageIdToPath.delete(staleId);
+
+      return removed;
+    }
     let imageDates = new Map(); // Cache file dates
     let imageMetadataCache = new Map(); // Cache PNG metadata to avoid re-fetching
     let imageSearchIndex = new Map(); // Index for search: filename -> {model, prompt}
     let imageDimensionsCache = new Map(); // Cache image dimensions: filename -> {width, height}
-    let allMetadataFetched = false; // Track if we've fetched metadata for all images
     let metadataFetchInProgress = false; // Track if fetch is currently running
     
     // Function to log actions to the server
@@ -2395,12 +3024,12 @@
       }
     }
     
-    // Function to fetch metadata for all images (for model filtering)
-    async function fetchAllImageMetadata(isBackground = false) {
-      if (allMetadataFetched) {
-        debugLog('[Model Filter] Metadata already fetched, skipping');
-        return;
-      }
+    // Function to fetch metadata for a target set (default: current page)
+    async function fetchAllImageMetadata(isBackground = false, targetFiles = null) {
+      const requestedFiles = Array.isArray(targetFiles) && targetFiles.length > 0
+        ? targetFiles
+        : getCurrentPageFiles();
+      const uniqueRequestedFiles = [...new Set(requestedFiles)];
       
       if (metadataFetchInProgress) {
         debugLog('[Model Filter] Fetch already in progress, waiting...');
@@ -2414,16 +3043,15 @@
       metadataFetchInProgress = true;
       
       try {
-        const unindexedFiles = allImageFiles.filter(f => !imageSearchIndex.has(f));
+        const unindexedFiles = uniqueRequestedFiles.filter(f => !imageSearchIndex.has(f));
         const total = unindexedFiles.length;
-        debugLog(`[Model Filter] ${isBackground ? 'Background indexing' : 'Fetching'} metadata for ${total} images...`);
+        debugLog(`[Model Filter] ${isBackground ? 'Background indexing' : 'Fetching'} metadata for ${total} active-page images...`);
         logToServer('metadata_fetch_start', { count: total, background: isBackground });
         
         if (total === 0) {
-          allMetadataFetched = true;
           metadataFetchInProgress = false;
           updateModelFilterButtonsState(false);
-          debugLog('[Model Filter] All images already indexed');
+          debugLog('[Model Filter] Active-page images already indexed');
           return;
         }
         
@@ -2519,7 +3147,6 @@
           }
         }
         
-        allMetadataFetched = true;
         updateModelFilterButtonsState(false);
         
         // Hide loading bar when metadata processing is complete (always hide, regardless of background)
@@ -2561,39 +3188,12 @@
         console.error('[Model Filter] Fatal error during metadata fetch:', err);
         logToServer('metadata_fetch_error', { error: err.message });
         updateModelFilterButtonsState(false);
-        // Still mark as fetched to avoid infinite retries
-        allMetadataFetched = true;
       } finally {
         metadataFetchInProgress = false;
       }
     }
     
     let initialPageLoaded = false; // Track if first page has finished loading
-    let backgroundIndexingScheduled = false; // Prevent multiple scheduling
-    
-    // Start background metadata indexing after images are loaded
-    function startBackgroundMetadataIndexing() {
-      if (backgroundIndexingScheduled) return;
-      backgroundIndexingScheduled = true;
-      
-      // Will be called when initial page finishes loading
-      debugLog('[Model Filter] Background indexing scheduled, waiting for images to load...');
-    }
-    
-    // Actually start the background indexing (called when page images finish loading)
-    function triggerBackgroundMetadataIndexing() {
-      if (!backgroundIndexingScheduled) return;
-      if (allMetadataFetched || metadataFetchInProgress) return;
-      
-      // Wait a bit after images load to let the browser settle
-      setTimeout(() => {
-        if (!allMetadataFetched && !metadataFetchInProgress) {
-          debugLog('[Model Filter] Images loaded, starting background metadata indexing...');
-          logToServer('metadata_background_start', { trigger: 'images_loaded' });
-          fetchAllImageMetadata(true);
-        }
-      }, 500);
-    }
     let layoutCache = null; // Cache for layout calculations
     let resizeThrottle = null; // Throttle for resize events
     let searchDebounce = null; // Debounce for search input
@@ -2634,6 +3234,11 @@
     let currentPage = 1;
     let imagesPerPage = PAGING_SETTINGS.default;
     let filteredImageFiles = []; // Images after filtering
+    function getCurrentPageFiles() {
+      const startIndex = (currentPage - 1) * imagesPerPage;
+      const endIndex = Math.min(startIndex + imagesPerPage, filteredImageFiles.length);
+      return filteredImageFiles.slice(startIndex, endIndex);
+    }
     
     // Favorite functionality
     function getFavoritesFolderPath(filename) {
@@ -2680,9 +3285,11 @@
     }
     
     async function toggleFavorite(filename, starButton) {
+      const actionScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
       try {
-        // Normalize the filename path (handle both / and \)
-        filename = filename.replace(/\\/g, '/');
+        const container = starButton ? starButton.closest('.img-container') : null;
+        const lightboxStarButton = document.getElementById('lightboxStarButton');
+        filename = resolveCurrentFilename(filename, starButton, container, lightboxStarButton);
         
         const isCurrentlyFavorited = filename.startsWith('Favorites/') || 
                                      filename.includes('/Favorites/');
@@ -2730,6 +3337,7 @@
         });
         
         if (response.ok) {
+          const imageId = updateImagePathById(oldPath, newPath);
           // Update the star button state immediately
           if (isCurrentlyFavorited) {
             starButton.classList.remove('favorited');
@@ -2740,7 +3348,6 @@
           }
           
           // Also update lightbox star button if it exists and shows the same file
-          const lightboxStarButton = document.getElementById('lightboxStarButton');
           if (lightboxStarButton && lightboxStarButton.dataset.filename === oldPath) {
             if (isCurrentlyFavorited) {
               lightboxStarButton.classList.remove('favorited');
@@ -2750,6 +3357,7 @@
               lightboxStarButton.setAttribute('title', 'Remove from favorites');
             }
             lightboxStarButton.dataset.filename = newPath;
+            if (imageId) lightboxStarButton.dataset.imageId = imageId;
           }
           
           // Update filename in arrays
@@ -2765,9 +3373,11 @@
           
           // Update all filename references in the UI
           starButton.dataset.filename = newPath;
+          if (imageId) starButton.dataset.imageId = imageId;
           const container = starButton.closest('.img-container');
           if (container) {
             container.dataset.filename = newPath;
+            if (imageId) container.dataset.imageId = imageId;
             
             // Store the current filename in container for reference
             container.dataset.currentFilename = newPath;
@@ -2821,12 +3431,14 @@
             const deleteButton = container.querySelector('.delete-button');
             if (deleteButton) {
               deleteButton.dataset.filename = newPath;
+              if (imageId) deleteButton.dataset.imageId = imageId;
             }
             
             // Update rating container filename reference
             const ratingContainer = container.querySelector('.rating-stars');
             if (ratingContainer) {
               ratingContainer.dataset.filename = newPath;
+              if (imageId) ratingContainer.dataset.imageId = imageId;
             }
           }
           
@@ -2861,6 +3473,8 @@
       } catch (error) {
         console.error('Error toggling favorite:', error);
         alert('Error updating favorite: ' + error.message);
+      } finally {
+        restoreScrollPositionStable(actionScrollY);
       }
     }
     
@@ -2887,20 +3501,9 @@
     }
     
     async function setRating(filename, rating, ratingContainer, container) {
+      const actionScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
       try {
-        // Normalize the filename path
-        filename = filename.replace(/\\/g, '/');
-        
-        // Get the current filename from container or ratingContainer if available (in case file was moved)
-        // This ensures we use the correct path even if the file was favorited/unfavorited
-        if (container) {
-          const containerFilename = container.dataset.filename || container.dataset.currentFilename;
-          if (containerFilename) {
-            filename = containerFilename.replace(/\\/g, '/');
-          }
-        } else if (ratingContainer && ratingContainer.dataset.filename) {
-          filename = ratingContainer.dataset.filename.replace(/\\/g, '/');
-        }
+        filename = resolveCurrentFilename(filename, container, ratingContainer);
         
         // Get current filename (may have existing rating)
         const currentRating = parseRatingFromFilename(filename);
@@ -2943,9 +3546,11 @@
         });
         
         if (response.ok) {
+          const imageId = updateImagePathById(oldPath, newPath);
           // Update rating display
           updateRatingDisplay(ratingContainer, newRating);
           ratingContainer.dataset.filename = newPath;
+          if (imageId && ratingContainer) ratingContainer.dataset.imageId = imageId;
           
           // Update filename in arrays
           const oldIndex = allImageFiles.indexOf(oldPath);
@@ -2961,6 +3566,7 @@
           // Update all filename references in the UI (similar to favorites)
           if (container) {
             container.dataset.filename = newPath;
+            if (imageId) container.dataset.imageId = imageId;
             
             // Update img.src to new path
             const img = container.querySelector('.image-wrapper img');
@@ -3006,12 +3612,14 @@
             const starButton = container.querySelector('.star-button');
             if (starButton) {
               starButton.dataset.filename = newPath;
+              if (imageId) starButton.dataset.imageId = imageId;
             }
             
             // Update delete button
             const deleteButton = container.querySelector('.delete-button');
             if (deleteButton) {
               deleteButton.dataset.filename = newPath;
+              if (imageId) deleteButton.dataset.imageId = imageId;
             }
           }
           
@@ -3021,6 +3629,7 @@
           if (lightboxRatingContainer && lightboxImg && lightboxImg.src && lightboxImg.src.includes(escapeFilename(oldPath))) {
             updateRatingDisplay(lightboxRatingContainer, newRating);
             lightboxRatingContainer.dataset.filename = newPath;
+            if (imageId) lightboxRatingContainer.dataset.imageId = imageId;
           }
           
           // Update lightbox image if it's showing this file
@@ -3030,6 +3639,7 @@
             const lightboxStarButton = document.getElementById('lightboxStarButton');
             if (lightboxStarButton) {
               lightboxStarButton.dataset.filename = newPath;
+              if (imageId) lightboxStarButton.dataset.imageId = imageId;
             }
           }
           
@@ -3041,6 +3651,8 @@
       } catch (error) {
         console.error('Error setting rating:', error);
         alert('Error updating rating: ' + error.message);
+      } finally {
+        restoreScrollPositionStable(actionScrollY);
       }
     }
     
@@ -3064,16 +3676,31 @@
         filenameEl.textContent = displayFilename;
         filenameEl.title = filename; // Full filename in tooltip
         
+        const modalScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+
         // Show modal
         modal.classList.add('active');
         
-        // Prevent body scroll when modal is open
+        // Lock body scroll without resetting page position.
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${modalScrollY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
         document.body.style.overflow = 'hidden';
         
         // Cleanup function
         const cleanup = () => {
           modal.classList.remove('active');
+          const previousTop = document.body.style.top;
+          const restoreY = previousTop ? Math.abs(parseInt(previousTop, 10) || 0) : modalScrollY;
+          document.body.style.position = '';
+          document.body.style.top = '';
+          document.body.style.left = '';
+          document.body.style.right = '';
+          document.body.style.width = '';
           document.body.style.overflow = '';
+          restoreScrollPositionStable(restoreY);
           // Remove event listeners
           cancelBtn.removeEventListener('click', handleCancel);
           deleteBtn.removeEventListener('click', handleDelete);
@@ -3120,49 +3747,42 @@
       });
     }
     
-    // Delete image function - MINIMAL approach: only hide image, no layout changes
-    async function deleteImage(filename, container) {
-      // Show custom confirmation modal
-      const confirmed = await showDeleteConfirmModal(filename);
-      if (!confirmed) {
-        return;
+    let armedDeleteButton = null;
+    let armedDeleteTimeout = null;
+
+    function clearArmedDeleteButton() {
+      if (armedDeleteTimeout) {
+        clearTimeout(armedDeleteTimeout);
+        armedDeleteTimeout = null;
       }
+      if (armedDeleteButton) {
+        armedDeleteButton.classList.remove('armed');
+        armedDeleteButton.setAttribute('data-label', 'Delete');
+        armedDeleteButton = null;
+      }
+    }
+    document.addEventListener('click', function(e) {
+      const clickedDeleteButton = e.target && e.target.closest && e.target.closest('.delete-button');
+      if (!clickedDeleteButton) {
+        clearArmedDeleteButton();
+      }
+    });
+
+    // Delete image function with smooth remove + masonry reflow.
+    async function deleteImage(filename, container) {
+      const actionScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
       
       try {
-        // Normalize the filename path
-        filename = filename.replace(/\\/g, '/');
-        
-        // MINIMAL DOM CHANGES ONLY - no layout-affecting operations
-        // 1. Mark container as deleted (CSS handles visual state)
-        container.classList.add('deleted');
-        container.dataset.deleted = 'true';
+        filename = resolveCurrentFilename(filename, container);
+
         container.style.pointerEvents = 'none';
-        
-        // 2. Hide the image (no broken image icon)
-        const img = container.querySelector('.image-wrapper img');
-        if (img) {
-          img.style.display = 'none';
-          img.src = ''; // Clear src to prevent loading
-        }
-        
-        // 3. Disable all buttons (no interaction, but keep them in DOM to preserve layout)
         const buttons = container.querySelectorAll('button');
         buttons.forEach(btn => {
           btn.disabled = true;
           btn.style.pointerEvents = 'none';
-          btn.style.opacity = '0';
+          btn.style.opacity = '0.35';
         });
-        
-        // 4. Remove click handler from wrapper (prevent lightbox opening)
-        const wrapper = container.querySelector('.image-wrapper');
-        if (wrapper) {
-          wrapper.onclick = null;
-          // Remove all event listeners by replacing onclick handler only
-          // DON'T use replaceChild - that causes layout recalculation
-          // Note: onclick is already null, so no need to removeEventListener
-        }
-        
-        // 5. Call delete endpoint (async, doesn't block)
+
         const response = await fetch('/delete-file', {
           method: 'POST',
           headers: {
@@ -3174,7 +3794,8 @@
         });
         
         if (response.ok) {
-          // Update data structures (no DOM changes)
+          const deletedImageId = getImageIdForPath(filename);
+
           const indexInAll = allImageFiles.indexOf(filename);
           if (indexInAll !== -1) {
             allImageFiles.splice(indexInAll, 1);
@@ -3187,31 +3808,43 @@
           
           imageSearchIndex.delete(filename);
           imageDimensionsCache.delete(filename);
-          
-          // Close lightbox if showing this image (only if needed)
+          imageMetadataCache.delete(filename);
+          imageDates.delete(filename);
+          pathToImageId.delete(filename);
+          if (deletedImageId) {
+            imageIdToPath.delete(deletedImageId);
+          }
+
           const lightbox = document.getElementById('lightbox');
-          if (lightbox && lightbox.style.display !== 'none') {
+          if (lightbox && lightbox.classList.contains('active')) {
             const lightboxImg = document.getElementById('lightboxImg');
             if (lightboxImg && lightboxImg.src && lightboxImg.src.includes(escapeFilename(filename))) {
-              closeLightbox();
+              hideLightbox();
             }
           }
-          
-          // Update image count LATER (defer to avoid layout shift)
-          // Don't call updateImageCount immediately - it changes DOM text
-          setTimeout(() => {
-            updateImageCount();
-          }, 100);
-        } else {
-          // Revert visual state on error
-          container.classList.remove('deleted');
-          container.dataset.deleted = '';
-          container.style.pointerEvents = '';
-          
-          if (img) {
-            img.style.display = '';
+
+          // Capture current container positions, animate the deleted card out,
+          // then relayout and animate surviving cards into place.
+          const otherContainers = allImageContainers.filter(c => c && c !== container && c.isConnected);
+          const previousPositions = captureContainerPositions(otherContainers);
+          await animateContainerRemoval(container);
+
+          if (container.parentNode) {
+            container.parentNode.removeChild(container);
           }
-          
+          allImageContainers = allImageContainers.filter(c => c !== container);
+          layoutCache = null;
+          layoutMasonry();
+          animateMasonryReflowFrom(previousPositions);
+
+          updateImageCount();
+          updatePaginationUI();
+        } else {
+          container.classList.remove('removing');
+          container.style.pointerEvents = '';
+          container.style.height = '';
+          container.style.maxHeight = '';
+          container.style.marginBottom = '';
           buttons.forEach(btn => {
             btn.disabled = false;
             btn.style.pointerEvents = '';
@@ -3230,16 +3863,11 @@
           alert('Failed to delete image: ' + errorMessage);
         }
       } catch (error) {
-        // Revert visual state on error
-        container.classList.remove('deleted');
-        container.dataset.deleted = '';
+        container.classList.remove('removing');
         container.style.pointerEvents = '';
-        
-        const img = container.querySelector('.image-wrapper img');
-        if (img) {
-          img.style.display = '';
-        }
-        
+        container.style.height = '';
+        container.style.maxHeight = '';
+        container.style.marginBottom = '';
         const buttons = container.querySelectorAll('button');
         buttons.forEach(btn => {
           btn.disabled = false;
@@ -3249,6 +3877,9 @@
         
         console.error('Error deleting image:', error);
         alert('Error deleting image: ' + error.message);
+      } finally {
+        clearArmedDeleteButton();
+        restoreScrollPositionStable(actionScrollY);
       }
     }
     
@@ -3458,7 +4089,7 @@
       return gb.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' GB';
     }
     
-    async function updateImageCount(skipSizeCalculation = false) {
+    async function updateImageCount(skipSizeCalculation = true) {
       const imageCountEl = document.getElementById('imageCount');
       if (!imageCountEl) return;
       
@@ -3561,6 +4192,17 @@
     function goToPage(page, preserveScroll = false) {
       const totalPages = getTotalPages();
       if (page < 1 || page > totalPages) return;
+
+      updateProcessingStatus(`Loading page ${page} of ${totalPages}...`, true);
+      const loadingBarContainer = document.getElementById('loadingBarContainer');
+      const loadingBarFill = document.getElementById('loadingBarFill');
+      const loadingPercentage = document.getElementById('loadingPercentage');
+      if (loadingBarContainer) loadingBarContainer.classList.remove('hidden');
+      if (loadingBarFill) loadingBarFill.style.width = '2%';
+      if (loadingPercentage) {
+        loadingPercentage.style.display = '';
+        loadingPercentage.textContent = '2%';
+      }
       
       debugLog(`[Page] Going to page ${page}/${totalPages}`);
       logToServer('page_change', { page, totalPages, imagesPerPage });
@@ -3582,17 +4224,7 @@
       updatePaginationUI();
       loadCurrentPage(preserveScroll);
       
-      // Scroll again after layout completes (only if not preserving)
-      // Don't scroll immediately - let layout complete first
-      if (!preserveScroll) {
-      setTimeout(() => {
-          requestAnimationFrame(() => {
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-          });
-        }, 100); // Wait for layout to start
-      }
+      // Avoid duplicate forced scroll-to-top passes; one pass is smoother.
     }
     
     function goToPreviousPage() {
@@ -3616,17 +4248,22 @@
     function loadCurrentPage(preserveScroll = false) {
       const gallery = document.getElementById('gallery');
       if (!gallery) return;
+      const pageLoadToken = ++currentPageLoadToken;
+      metadataQueue = [];
       
       // Calculate which images to show for current page
       const startIndex = (currentPage - 1) * imagesPerPage;
-      const endIndex = Math.min(startIndex + imagesPerPage, filteredImageFiles.length);
-      const pageFiles = filteredImageFiles.slice(startIndex, endIndex);
+      const pageFiles = getCurrentPageFiles();
       
       // Show loading bar for page loading
       const loadingBarContainer = document.getElementById('loadingBarContainer');
       const loadingBarFill = document.getElementById('loadingBarFill');
       const loadingPercentage = document.getElementById('loadingPercentage');
       const imageCountEl = document.getElementById('imageCount');
+      const loadingScreenImageCount = document.getElementById('loadingScreenImageCount');
+      if (!initialPageLoaded && loadingScreenImageCount) {
+        loadingScreenImageCount.textContent = `${filteredImageFiles.length.toLocaleString()} Images`;
+      }
       
       if (loadingBarContainer && pageFiles.length > 0) {
         loadingBarContainer.classList.remove('hidden');
@@ -3639,10 +4276,11 @@
         }
         // Initialize loading bar to 0%
         if (loadingBarFill) {
-          loadingBarFill.style.width = '0%';
+          loadingBarFill.style.width = '2%';
         }
         if (loadingPercentage) {
-          loadingPercentage.textContent = '0%';
+          loadingPercentage.style.display = '';
+          loadingPercentage.textContent = '2%';
         }
       }
       
@@ -3650,6 +4288,9 @@
       let pageImagesLoaded = 0;
       let pageImagesErrored = 0;
       const totalPageImages = pageFiles.length;
+      if (totalPageImages > 0) {
+        updateProcessingStatus(`Preparing ${totalPageImages} images...`, true);
+      }
       
       function updatePageLoadingProgress() {
         if (!loadingBarFill || !loadingPercentage) return;
@@ -3730,10 +4371,8 @@
             // Layout was calculated in PHASE 1 with correct placeholder sizes
             // Images load into existing placeholders without changing layout
               
-              // Start background metadata indexing after first page loads
               if (!initialPageLoaded) {
                 initialPageLoaded = true;
-                triggerBackgroundMetadataIndexing();
               }
           }, 100); // Small delay to batch updates
         }
@@ -3747,9 +4386,6 @@
         clearTimeout(window.finalLayoutTimeout);
         window.finalLayoutTimeout = null;
       }
-      
-      // Preserve deleted containers before clearing
-      const deletedContainers = Array.from(document.querySelectorAll('.img-container.deleted'));
       
       gallery.innerHTML = '';
       galleryColumns = [];
@@ -3769,6 +4405,9 @@
         }
         if (loadingScreenMessage) {
           loadingScreenMessage.textContent = 'No Images To Load...';
+        }
+        if (loadingScreenImageCount) {
+          loadingScreenImageCount.textContent = '0 Images';
         }
         if (loadingScreenProgress) {
           loadingScreenProgress.style.width = '0%';
@@ -3808,6 +4447,9 @@
         if (loadingScreenMessage) {
           loadingScreenMessage.textContent = 'Calculating Size, Dimensions, and Layout...';
         }
+        if (loadingScreenImageCount) {
+          loadingScreenImageCount.textContent = `${filteredImageFiles.length.toLocaleString()} Images`;
+        }
         if (loadingScreenProgress) {
           loadingScreenProgress.style.width = '0%';
         }
@@ -3815,46 +4457,25 @@
       
       const maxWidth = baseColumnWidth * currentSizeMultiplier;
       
-      // Load ALL dimensions first (PHASE 1) - with granular progress updates
-      let dimensionsLoaded = 0;
-      const totalDimensions = pageFiles.length;
-      
-      // Update progress function - updates immediately for smooth feedback
-      function updateDimensionProgress() {
-        if (loadingScreenProgress && isInitialLoad) {
-          // Calculate progress as percentage (0-50% for dimension phase)
-          const progressPercent = Math.min(50, (dimensionsLoaded / totalDimensions) * 50);
-          // Update immediately without batching for smooth continuous feedback
-          loadingScreenProgress.style.width = progressPercent + '%';
-        }
+      // Build placeholders immediately from cached dimensions only.
+      // Avoid blocking initial paint on additional dimension preloads.
+      const results = pageFiles.map((filename) => ({
+        filename,
+        dims: imageDimensionsCache.get(filename) || null
+      }));
+      if (loadingScreenProgress && isInitialLoad) {
+        loadingScreenProgress.style.width = '50%';
       }
-      
-      const dimensionPromises = pageFiles.map((filename, index) => 
-        getImageDimensions(filename).then(dims => {
-          // Update progress immediately for each dimension loaded
-          if (loadingScreenProgress && isInitialLoad) {
-            dimensionsLoaded++;
-            updateDimensionProgress();
-          }
-          return { filename, dims };
-        }).catch(() => {
-          // Still count errors as progress
-          if (loadingScreenProgress && isInitialLoad) {
-            dimensionsLoaded++;
-            updateDimensionProgress();
-          }
-          return { filename, dims: null };
-        })
-      );
-      
-      Promise.all(dimensionPromises).then(results => {
-        // Ensure we're at 50% after dimensions are loaded
-        if (loadingScreenProgress && isInitialLoad) {
-          loadingScreenProgress.style.width = '50%';
-        }
-        if (loadingScreenMessage && isInitialLoad) {
-          loadingScreenMessage.textContent = 'Creating layout...';
-        }
+      if (loadingBarFill) {
+        loadingBarFill.style.width = '35%';
+      }
+      if (loadingPercentage) {
+        loadingPercentage.style.display = '';
+        loadingPercentage.textContent = '35%';
+      }
+      if (loadingScreenMessage && isInitialLoad) {
+        loadingScreenMessage.textContent = 'Creating layout...';
+      }
         
         // Now create all containers with CORRECT placeholder sizes (PHASE 1)
         const containerData = [];
@@ -3863,6 +4484,7 @@
         const container = document.createElement('div');
         container.className = 'img-container';
           container.dataset.filename = filename;
+          container.dataset.imageId = ensureImageIdForPath(filename) || '';
 
         const wrapper = document.createElement('div');
         wrapper.className = 'image-wrapper';
@@ -3932,7 +4554,7 @@
           wrapper.dataset.loaded = 'true';
           
           // Queue metadata extraction (but don't process until all images loaded)
-          metadataQueue.push({ img, label, baseFilename, copyPromptBtn, container, filename });
+          metadataQueue.push({ img, label, baseFilename, copyPromptBtn, container, filename, pageLoadToken });
           // Don't call processMetadataQueue() here - wait until all images are loaded
         };
         
@@ -3949,10 +4571,30 @@
           pageImagesErrored++;
           updatePageLoadingProgress();
           
-          // Only show error if image actually failed (has src and is in error state)
+          // If image failed (404/missing), remove stale references and avoid black/error panels.
           if (img.src && img.complete && img.naturalWidth === 0) {
-            container.innerHTML =
-              '<div style="padding:12px;color:#c00;">Failed to load: ' + filename + '</div>';
+            const removed = removeMissingImageFromState(filename);
+            container.classList.add('deleted');
+            container.dataset.deleted = 'true';
+            const imageWrapper = container.querySelector('.image-wrapper');
+            if (imageWrapper) {
+              imageWrapper.style.minHeight = '60px';
+            }
+            if (img) {
+              img.style.display = 'none';
+            }
+            const buttons = container.querySelectorAll('button');
+            buttons.forEach(btn => {
+              btn.disabled = true;
+              btn.style.pointerEvents = 'none';
+              btn.style.opacity = '0';
+            });
+            if (removed) {
+              setTimeout(() => {
+                updateImageCount(true);
+                updatePaginationUI();
+              }, 0);
+            }
           }
         };
 
@@ -3966,18 +4608,37 @@
         copyPromptBtn.setAttribute('data-label', 'Copy Prompt');
         copyPromptBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
         copyPromptBtn.style.display = 'none';
-        copyPromptBtn.addEventListener('click', function(e) {
+        copyPromptBtn.addEventListener('click', async function(e) {
+          e.preventDefault();
           e.stopPropagation();
-          const prompt = this.dataset.prompt;
-          if (prompt) {
-            navigator.clipboard.writeText(prompt).then(() => {
-              this.classList.add('copied');
-              setTimeout(() => {
-                this.classList.remove('copied');
-              }, 2000);
-            }).catch(err => {
-              console.error('Failed to copy:', err);
-            });
+          let prompt = (this.dataset.prompt || '').trim();
+          if (!prompt) {
+            try {
+              const currentFilename = resolveCurrentFilename(container?.dataset?.filename || filename, container, this);
+              const metadata = await getPngMetadata(escapeFilename(currentFilename));
+              const displayData = formatMetadataForDisplay(metadata);
+              prompt = (displayData['Prompt'] || '').trim();
+              if (prompt) {
+                this.dataset.prompt = prompt;
+                if (container) {
+                  container.dataset.prompt = prompt.toLowerCase();
+                }
+                this.style.display = 'flex';
+              }
+            } catch (err) {}
+          }
+          if (!prompt) {
+            alert('Prompt is not available for this image.');
+            return;
+          }
+          const copied = await copyTextRobust(prompt);
+          if (copied) {
+            this.classList.add('copied');
+            setTimeout(() => {
+              this.classList.remove('copied');
+            }, 2000);
+          } else {
+            alert('Copy failed. Please try again.');
           }
         });
 
@@ -4042,6 +4703,7 @@
         starButton.setAttribute('data-label', 'Add to Favorites');
         starButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
         starButton.dataset.filename = filename;
+        starButton.dataset.imageId = container.dataset.imageId || '';
         
         // Check if image is in Favorites folder (check for Favorites at start or anywhere in path)
         const isFavorited = filename.startsWith('Favorites/') || 
@@ -4069,12 +4731,24 @@
         deleteButton.setAttribute('data-label', 'Delete');
         deleteButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
         deleteButton.dataset.filename = filename;
+        deleteButton.dataset.imageId = container.dataset.imageId || '';
         
         deleteButton.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
           
+          if (armedDeleteButton !== this) {
+            clearArmedDeleteButton();
+            armedDeleteButton = this;
+            this.classList.add('armed');
+            this.setAttribute('data-label', 'Click again to delete');
+            armedDeleteTimeout = setTimeout(() => {
+              clearArmedDeleteButton();
+            }, 4000);
+            return;
+          }
+
           const currentFilename = this.dataset.filename || filename;
           deleteImage(currentFilename, container);
         });
@@ -4086,6 +4760,7 @@
         const ratingContainer = document.createElement('div');
         ratingContainer.className = 'rating-stars';
         ratingContainer.dataset.filename = filename;
+        ratingContainer.dataset.imageId = container.dataset.imageId || '';
         
         // Create 5 stars in reverse order (top = 5, bottom = 1)
         for (let i = 5; i >= 1; i--) {
@@ -4136,7 +4811,10 @@
             // Get current filename from container (may have been updated if file was moved)
             const currentContainer = e.target.closest('.img-container');
             const currentFilename = currentContainer?.dataset.filename || currentContainer?.dataset.currentFilename || capturedFilename;
-            const index = capturedStartIndex + capturedPageIndex; // Index in filteredImageFiles
+            let index = filteredImageFiles.findIndex(f => f === currentFilename);
+            if (index < 0) {
+              index = allImageFiles.findIndex(f => f === currentFilename);
+            }
             // Use current filename to construct URL - this ensures moved files work correctly
             const imageUrl = escapeFilename(currentFilename);
             showLightbox(imageUrl, currentFilename, index);
@@ -4144,18 +4822,11 @@
           };
         })(pageIndex, startIndex, filename);
         
-        // Attach to all three elements to ensure clicks work regardless of what's clicked
+        // Attach once at container level to avoid duplicate/racing handlers.
         container.addEventListener('click', openLightbox);
-        wrapper.addEventListener('click', openLightbox);
-        img.addEventListener('click', openLightbox);
 
           // Store container data for later (including handlers)
           containerData.push({ container, img, placeholder, filename, copyPromptBtn, label, baseFilename, handleImageLoad, handleImageError });
-        });
-        
-        // Re-add deleted containers
-      deletedContainers.forEach(deletedContainer => {
-          containerData.push({ container: deletedContainer });
         });
         
         // PHASE 1 COMPLETE: All containers created with correct sizes
@@ -4172,8 +4843,8 @@
           loadingScreenMessage.textContent = 'Ready!';
         }
         
-        // PHASE 2: Force load ALL images in background using fetch() - bypasses browser lazy loading
-        // This ensures ALL images download immediately, regardless of viewport position
+        // PHASE 2: Force load all images for the active page in background using fetch()
+        // This keeps page transitions fast without preloading the whole library.
         requestAnimationFrame(() => {
             // Now containers are definitely in DOM - start loading images
             // Track when all images are loaded to trigger metadata
@@ -4185,16 +4856,11 @@
               if (imagesLoadedCount + imagesErroredCount >= totalImagesToLoad && totalImagesToLoad > 0) {
                 // All images loaded - NOW start metadata processing
                 processMetadataQueue();
-                
-                // Start background metadata indexing after ALL images are loaded
-                if (isInitialLoad) {
-                  triggerBackgroundMetadataIndexing();
-                }
               }
             };
             
-          // FORCE LOAD: Use fetch() to preload all images in background, then set blob URLs
-          // This bypasses browser lazy loading completely - all images download immediately
+          // FORCE LOAD: preload active-page images in background, then set blob URLs
+          // Avoids global preloading for large libraries.
           containerData.forEach(({ img, filename, placeholder, handleImageLoad, handleImageError }) => {
             if (!img || !filename) return;
             
@@ -4273,48 +4939,8 @@
             domImg.addEventListener('load', loadHandler, { once: true });
             domImg.addEventListener('error', errorHandler, { once: true });
             
-            // FORCE LOAD: Use Image() object to preload, then set src on DOM element
-            // This bypasses browser lazy loading - Image() objects load immediately regardless of viewport
-            const preloadImg = new Image();
-            preloadImg.loading = 'eager';
-            preloadImg.decoding = 'async';
-            
-            // Preload the image using Image() object - this forces download
-            preloadImg.onload = () => {
-              // Image is loaded in memory - now set on DOM element
-              domImg.loading = 'eager';
-              domImg.src = imageUrl;
-              
-              // Check if already loaded (cached)
-              if (domImg.complete && domImg.naturalWidth > 0) {
-                setTimeout(() => {
-                  if (!domImg.classList.contains('loaded')) {
-                    loadHandler();
-                  }
-                }, 0);
-              }
-            };
-            
-            preloadImg.onerror = () => {
-              // Preload failed, but try direct src anyway
-              if (DEBUG_MODE) console.warn('Preload failed for', filename, ', using direct src');
-              domImg.loading = 'eager';
-              domImg.src = imageUrl;
-              
-              // Check if already loaded (cached)
-              if (domImg.complete && domImg.naturalWidth > 0) {
-                setTimeout(() => {
-                  if (!domImg.classList.contains('loaded')) {
-                    loadHandler();
-                  }
-                }, 0);
-              }
-            };
-            
-            // Start preloading immediately - this forces browser to download
-            preloadImg.src = imageUrl;
-            
-            // Also set src directly on DOM element as backup (browser will use cache if preload completes first)
+            // Single-pass load: set src once on the DOM image.
+            // Avoid extra duplicate preloading work for large pages.
             domImg.loading = 'eager';
             domImg.src = imageUrl;
             
@@ -4495,7 +5121,6 @@
           }, 300);
         }
       });
-    });
   }
 
     function filterImages(searchQuery, preserveScrollY = null) {
@@ -4658,6 +5283,7 @@
     // Metadata extraction queue with concurrency limit
     let metadataQueue = [];
     let activeMetadataExtractions = 0;
+    let currentPageLoadToken = 0;
     const MAX_CONCURRENT_METADATA = 5; // Limit concurrent metadata fetches
     
     function processMetadataQueue() {
@@ -4665,11 +5291,20 @@
         return;
       }
       
-      const { img, label, baseFilename, copyPromptBtn, container, filename } = metadataQueue.shift();
+      const { img, label, baseFilename, copyPromptBtn, container, filename, pageLoadToken } = metadataQueue.shift();
+      if (pageLoadToken !== currentPageLoadToken || !container || !container.isConnected) {
+        if (metadataQueue.length > 0) {
+          setTimeout(processMetadataQueue, 0);
+        }
+        return;
+      }
       activeMetadataExtractions++;
       
       getPngMetadata(img.src)
         .then(metadata => {
+          if (pageLoadToken !== currentPageLoadToken || !container || !container.isConnected) {
+            return;
+          }
           const displayData = formatMetadataForDisplay(metadata);
           const parts = [baseFilename];
           if (displayData['Model']) parts.push(displayData['Model']);
@@ -4714,6 +5349,9 @@
           // The search will work on the next manual search or when user types
         })
         .catch(err => {
+          if (pageLoadToken !== currentPageLoadToken || !container || !container.isConnected) {
+            return;
+          }
           // If metadata extraction fails, keep the base filename
           label.textContent = baseFilename;
           // Try to get dimensions from image
@@ -4733,327 +5371,293 @@
     // Embedded image list - injected by inject_image_list.py
     // IMAGE_LIST_PLACEHOLDER
     const embeddedImageList = [
-  "2025-12-28/00000-2487163006-swapped.png",
-  "2025-12-28/00001-1636525309-swapped.png",
-  "2025-12-28/00004-1636525309-swapped.png",
-  "2025-12-28/00006-1636525309-swapped.png",
-  "2025-12-28/00010-1636525309-swapped.png",
-  "2025-12-28/00011-1636525309-swapped.png",
-  "2025-12-28/00013-1636525309-swapped.png",
-  "2025-12-28/00014-1636525309-swapped.png",
-  "2025-12-28/00015-1636525309-swapped.png",
-  "2025-12-28/00018-1636525309-swapped.png",
-  "2025-12-28/00019-1636525309-swapped.png",
-  "2025-12-28/00021-1636525309-swapped.png",
-  "2025-12-28/00022-1636525309-swapped.png",
-  "2025-12-28/00024-1636525309-swapped.png",
-  "2025-12-28/00025-1636525309-swapped.png",
-  "2025-12-28/00028-1636525309-swapped.png",
-  "2025-12-28/00029-1636525309-swapped.png",
-  "2025-12-28/00030-1636525309-swapped.png",
-  "2025-12-28/00031-1636525309-swapped_04.png",
-  "2025-12-28/00033-1636525309-swapped.png",
-  "2025-12-28/00034-1636525309-swapped.png",
-  "2025-12-28/00035-1636525309-swapped.png",
-  "2025-12-28/00037-1636525309-swapped.png",
-  "2025-12-28/00038-1636525309-swapped.png",
-  "2025-12-28/00039-1636525309-swapped.png",
-  "2025-12-28/00040-1636525309-swapped.png",
-  "2025-12-28/00041-1636525309-swapped.png",
-  "2025-12-28/00042-1636525309-swapped.png",
-  "2025-12-28/00043-1636525309-swapped.png",
-  "2025-12-28/00044-1636525309-swapped.png",
-  "2025-12-28/00048-1636525309-swapped.png",
-  "2025-12-28/00049-1636525309-swapped.png",
-  "2025-12-28/00051-1636525309-swapped.png",
-  "2025-12-28/00052-1636525309-swapped.png",
-  "2025-12-28/00053-1636525309-swapped.png",
-  "2025-12-28/00054-1636525309-swapped.png",
-  "2025-12-28/00055-1636525309-swapped.png",
-  "2025-12-28/00056-1636525309-swapped.png",
-  "2025-12-28/00057-1636525309-swapped.png",
-  "2025-12-28/00058-1636525309-swapped.png",
-  "2025-12-28/00060-1636525309-swapped.png",
-  "2025-12-28/00061-1636525309-swapped.png",
-  "2025-12-28/00062-1636525309-swapped.png",
-  "2025-12-28/00063-1636525309-swapped.png",
-  "2025-12-28/00065-1636525309-swapped.png",
-  "2025-12-28/00066-1636525309-swapped.png",
-  "2025-12-28/00068-1636525309-swapped.png",
-  "2025-12-28/00069-1636525309-swapped.png",
-  "2025-12-28/00070-1636525309-swapped.png",
-  "2025-12-28/00071-1636525309-swapped.png",
-  "2025-12-28/00072-1636525309-swapped.png",
-  "2025-12-28/00073-1636525309-swapped.png",
-  "2025-12-28/00075-1636525309-swapped.png",
-  "2025-12-28/00076-1636525309-swapped.png",
-  "2025-12-28/00077-1636525309-swapped.png",
-  "2025-12-28/00078-1636525309-swapped.png",
-  "2025-12-28/00079-1636525309-swapped.png",
-  "2025-12-28/00080-1636525309-swapped.png",
-  "2025-12-28/00081-1636525309-swapped.png",
-  "2025-12-28/00082-1636525309-swapped.png",
-  "2025-12-28/00085-1636525309-swapped.png",
-  "2025-12-28/00086-1636525309-swapped.png",
-  "2025-12-28/00087-1636525309-swapped.png",
-  "2025-12-28/00088-1636525309-swapped.png",
-  "2025-12-28/00089-1636525309-swapped.png",
-  "2025-12-28/00091-1636525309-swapped.png",
-  "2025-12-28/00092-1636525309-swapped.png",
-  "2025-12-28/00093-1636525309-swapped.png",
-  "2025-12-28/00094-1636525309-swapped.png",
-  "2025-12-28/00097-1636525309-swapped.png",
-  "2025-12-28/00098-1636525309-swapped.png",
-  "2025-12-28/00099-1636525309-swapped.png",
-  "2025-12-28/00100-1636525309-swapped.png",
-  "2025-12-28/00101-1636525309-swapped.png",
-  "2025-12-28/00102-1636525309-swapped.png",
-  "2025-12-28/00103-1636525309-swapped.png",
-  "2025-12-28/00104-1636525309-swapped.png",
-  "2025-12-28/00106-1636525309-swapped.png",
-  "2025-12-28/00108-1636525309-swapped.png",
-  "2025-12-28/00110-1636525309-swapped.png",
-  "2025-12-28/00112-1636525309-swapped.png",
-  "2025-12-28/00113-1636525309-swapped.png",
-  "2025-12-28/00114-1636525309-swapped.png",
-  "2025-12-28/00116-1636525309-swapped.png",
-  "2025-12-28/00118-1636525309-swapped.png",
-  "2025-12-28/00119-1636525309-swapped.png",
-  "2025-12-28/00120-1636525309-swapped.png",
-  "2025-12-28/00121-1636525309-swapped.png",
-  "2025-12-28/00122-1636525309-swapped.png",
-  "2025-12-28/00125-1636525309-swapped.png",
-  "2025-12-28/00126-1636525309-swapped.png",
-  "2025-12-28/00128-1636525309-swapped.png",
-  "2025-12-28/00129-1636525309-swapped.png",
-  "2025-12-28/00130-1636525309-swapped.png",
-  "2025-12-28/00132-1636525309-swapped.png",
-  "2025-12-28/00133-1636525309-swapped.png",
-  "2025-12-28/00134-1636525309-swapped.png",
-  "2025-12-28/00135-1636525309-swapped.png",
-  "2025-12-28/00136-1636525309-swapped.png",
-  "2025-12-28/00137-1636525309-swapped.png",
-  "2025-12-28/00138-1636525309-swapped.png",
-  "2025-12-28/00139-1636525309-swapped.png",
-  "2025-12-28/00140-1636525309-swapped.png",
-  "2025-12-28/00141-1636525309-swapped.png",
-  "2025-12-28/00142-1636525309-swapped.png",
-  "2025-12-28/00143-1636525309-swapped.png",
-  "2025-12-28/00145-1636525309-swapped.png",
-  "2025-12-28/00146-1636525309-swapped.png",
-  "2025-12-28/00147-1636525309-swapped.png",
-  "2025-12-28/00148-1636525309-swapped.png",
-  "2025-12-28/00149-1636525309-swapped.png",
-  "2025-12-28/00150-1636525309-swapped.png",
-  "2025-12-28/00151-1636525309-swapped.png",
-  "2025-12-28/00152-1636525309-swapped.png",
-  "2025-12-28/00153-1636525309-swapped.png",
-  "2025-12-28/00154-1636525309-swapped.png",
-  "2025-12-28/00156-1636525309-swapped.png",
-  "2025-12-28/00157-1636525309-swapped.png",
-  "2025-12-28/00158-1636525309-swapped.png",
-  "2025-12-28/00159-1636525309-swapped.png",
-  "2025-12-28/00160-1636525309-swapped.png",
-  "2025-12-28/00161-1636525309-swapped.png",
-  "2025-12-28/00162-1636525309-swapped.png",
-  "2025-12-28/00163-1636525309-swapped.png",
-  "2025-12-28/00164-1636525309-swapped.png",
-  "2025-12-28/00165-1636525309-swapped.png",
-  "2025-12-28/00166-1636525309-swapped.png",
-  "2025-12-28/00167-1636525309-swapped.png",
-  "2025-12-28/00168-1636525309-swapped.png",
-  "2025-12-28/00169-1636525309-swapped.png",
-  "2025-12-28/00170-1636525309-swapped.png",
-  "2025-12-28/00172-1636525309-swapped.png",
-  "2025-12-28/00173-1636525309-swapped.png",
-  "2025-12-28/00174-1636525309-swapped.png",
-  "2025-12-28/00175-1636525309-swapped.png",
-  "2025-12-28/00176-1636525309-swapped.png",
-  "2025-12-28/00177-1636525309-swapped.png",
-  "2025-12-28/00178-1636525309-swapped.png",
-  "2025-12-28/00179-1636525309-swapped.png",
-  "2025-12-28/00180-1636525309-swapped.png",
-  "2025-12-28/00181-1636525309-swapped.png",
-  "2025-12-28/00182-1636525309-swapped.png",
-  "2025-12-28/00183-1636525309-swapped.png",
-  "2025-12-28/00184-1636525309-swapped.png",
-  "2025-12-28/00187-1636525309-swapped.png",
-  "2025-12-28/00188-1636525309-swapped.png",
-  "2025-12-28/00189-1636525309-swapped.png",
-  "2025-12-28/00190-1636525309-swapped.png",
-  "2025-12-28/00191-1636525309-swapped.png",
-  "2025-12-28/00192-1636525309-swapped.png",
-  "2025-12-28/00194-1636525309-swapped.png",
-  "2025-12-28/00196-1636525309-swapped.png",
-  "2025-12-28/00197-1636525309-swapped.png",
-  "2025-12-28/00198-1636525309-swapped.png",
-  "2025-12-28/00199-1636525309-swapped.png",
-  "2025-12-28/00200-1636525309-swapped.png",
-  "2025-12-28/00201-1636525309-swapped.png",
-  "2025-12-28/00203-1636525309-swapped.png",
-  "2025-12-28/00204-1636525309-swapped.png",
-  "2025-12-28/00206-1636525309-swapped.png",
-  "2025-12-28/00208-1636525309-swapped.png",
-  "2025-12-28/00209-1636525309-swapped.png",
-  "2025-12-28/00210-1636525309-swapped.png",
-  "2025-12-28/00211-1636525309-swapped.png",
-  "2025-12-28/00212-1636525309-swapped.png",
-  "2025-12-28/00213-1636525309-swapped.png",
-  "2025-12-28/00214-1636525309-swapped.png",
-  "2025-12-28/00215-1636525309-swapped.png",
-  "2025-12-28/00216-1636525309-swapped.png",
-  "2025-12-28/00217-1636525309-swapped.png",
-  "2025-12-28/00218-1636525309-swapped.png",
-  "2025-12-28/00220-1636525309-swapped.png",
-  "2025-12-28/00221-1636525309-swapped.png",
-  "2025-12-28/00222-1636525309-swapped.png",
-  "2025-12-28/00223-1636525309-swapped.png",
-  "2025-12-28/00225-1636525309-swapped.png",
-  "2025-12-28/00226-1636525309-swapped.png",
-  "2025-12-28/00227-1636525309-swapped.png",
-  "2025-12-28/00230-1636525309-swapped.png",
-  "2025-12-28/00231-1636525309-swapped.png",
-  "2025-12-28/00232-1636525309-swapped.png",
-  "2025-12-28/00233-1636525309-swapped.png",
-  "2025-12-28/00234-1636525309-swapped.png",
-  "2025-12-28/00235-1636525309-swapped.png",
-  "2025-12-28/00236-1636525309-swapped.png",
-  "2025-12-28/00237-1636525309-swapped.png",
-  "2025-12-28/00238-1636525309-swapped.png",
-  "2025-12-28/00239-1636525309-swapped.png",
-  "2025-12-28/00240-1636525309-swapped.png",
-  "2025-12-28/00241-1636525309-swapped.png",
-  "2025-12-28/00242-1636525309-swapped.png",
-  "2025-12-28/00243-1636525309-swapped.png",
-  "2025-12-28/00244-1636525309-swapped.png",
-  "2025-12-28/00245-1636525309-swapped.png",
-  "2025-12-28/00246-1636525309-swapped.png",
-  "2025-12-28/00247-1636525309-swapped.png",
-  "2025-12-28/00248-1636525309-swapped.png",
-  "2025-12-28/00249-1636525309-swapped.png",
-  "2025-12-28/00250-1636525309-swapped.png",
-  "2025-12-28/00251-1636525309-swapped.png",
-  "2025-12-28/00252-1636525309-swapped.png",
-  "2025-12-28/00253-1636525309-swapped.png",
-  "2025-12-28/00254-1636525309-swapped.png",
-  "2025-12-28/00255-1636525309-swapped.png",
-  "2025-12-28/00256-1636525309-swapped.png",
-  "2025-12-28/00257-1636525309-swapped.png",
-  "2025-12-28/00258-1636525309-swapped.png",
-  "2025-12-28/00259-1636525309-swapped.png",
-  "2025-12-28/00260-1636525309-swapped.png",
-  "2025-12-28/00261-1636525309-swapped.png",
-  "2025-12-28/00262-1636525309-swapped.png",
-  "2025-12-28/00264-1636525309-swapped.png",
-  "2025-12-28/00265-1636525309-swapped.png",
-  "2025-12-28/00266-1636525309-swapped.png",
-  "2025-12-28/00267-1636525309-swapped.png",
-  "2025-12-28/00268-1636525309-swapped.png",
-  "2025-12-28/00269-1636525309-swapped.png",
-  "2025-12-28/00270-1636525309-swapped.png",
-  "2025-12-28/00271-1636525309-swapped.png",
-  "2025-12-28/00272-1636525309-swapped.png",
-  "2025-12-28/00273-1636525309-swapped.png",
-  "2025-12-28/00274-1636525309-swapped.png",
-  "2025-12-28/00275-1636525309-swapped.png",
-  "2025-12-28/00276-1636525309-swapped.png",
-  "2025-12-28/00277-1636525309-swapped.png",
-  "2025-12-28/00278-1636525309-swapped.png",
-  "2025-12-28/00279-1636525309-swapped.png",
-  "2025-12-28/00280-1636525309-swapped.png",
-  "2025-12-28/00281-1636525309-swapped.png",
-  "2025-12-28/00282-1636525309-swapped.png",
-  "2025-12-28/00284-1636525309-swapped.png",
-  "2025-12-28/00285-1636525309-swapped.png",
-  "2025-12-28/00287-1636525309-swapped.png",
-  "2025-12-28/00288-1636525309-swapped.png",
-  "2025-12-28/00291-1636525309-swapped.png",
-  "2025-12-28/00292-1636525309-swapped.png",
-  "2025-12-28/00293-1636525309-swapped.png",
-  "2025-12-28/00294-1636525309-swapped.png",
-  "2025-12-28/00295-1636525309-swapped.png",
-  "2025-12-28/00296-1636525309-swapped.png",
-  "2025-12-28/00297-1636525309-swapped.png",
-  "2025-12-28/00298-1636525309-swapped.png",
-  "2025-12-28/00300-1636525309-swapped.png",
-  "2025-12-28/00301-1636525309-swapped.png",
-  "2025-12-28/00302-1636525309-swapped.png",
-  "2025-12-28/00305-1636525309-swapped.png",
-  "2025-12-28/00307-1636525309-swapped.png",
-  "2025-12-28/00309-1636525309-swapped.png",
-  "2025-12-28/00310-1636525309-swapped.png",
-  "2025-12-28/00311-1636525309-swapped.png",
-  "2025-12-28/00312-1636525309-swapped.png",
-  "2025-12-28/00314-1636525309-swapped.png",
-  "2025-12-28/00316-1636525309-swapped.png",
-  "2025-12-28/00317-1636525309-swapped.png",
-  "2025-12-28/00319-1636525309-swapped.png",
-  "2025-12-28/00320-1636525309-swapped.png",
-  "2025-12-28/00321-1636525309-swapped.png",
-  "2025-12-28/00322-1636525309-swapped.png",
-  "2025-12-28/00323-1636525309-swapped.png",
-  "2025-12-28/00324-1636525309-swapped.png",
-  "Favorites/00002-1636525309-swapped.png",
-  "Favorites/00003-1636525309-swapped.png",
-  "Favorites/00005-1636525309-swapped.png",
-  "Favorites/00008-1636525309-swapped.png",
-  "Favorites/00009-1636525309-swapped.png",
-  "Favorites/00012-1636525309-swapped.png",
-  "Favorites/00016-1636525309-swapped.png",
-  "Favorites/00017-1636525309-swapped.png",
-  "Favorites/00020-1636525309-swapped.png",
-  "Favorites/00023-1636525309-swapped.png",
-  "Favorites/00026-1636525309-swapped.png",
-  "Favorites/00027-1636525309-swapped.png",
-  "Favorites/00032-1636525309-swapped.png",
-  "Favorites/00036-1636525309-swapped.png",
-  "Favorites/00045-1636525309-swapped.png",
-  "Favorites/00046-1636525309-swapped.png",
-  "Favorites/00047-1636525309-swapped.png",
-  "Favorites/00050-1636525309-swapped.png",
-  "Favorites/00059-1636525309-swapped.png",
-  "Favorites/00064-1636525309-swapped.png",
-  "Favorites/00067-1636525309-swapped.png",
-  "Favorites/00074-1636525309-swapped.png",
-  "Favorites/00083-1636525309-swapped.png",
-  "Favorites/00084-1636525309-swapped.png",
-  "Favorites/00090-1636525309-swapped.png",
-  "Favorites/00095-1636525309-swapped.png",
-  "Favorites/00096-1636525309-swapped.png",
-  "Favorites/00105-1636525309-swapped.png",
-  "Favorites/00107-1636525309-swapped.png",
-  "Favorites/00109-1636525309-swapped.png",
-  "Favorites/00111-1636525309-swapped.png",
-  "Favorites/00115-1636525309-swapped.png",
-  "Favorites/00117-1636525309-swapped.png",
-  "Favorites/00123-1636525309-swapped.png",
-  "Favorites/00124-1636525309-swapped.png",
-  "Favorites/00127-1636525309-swapped.png",
-  "Favorites/00131-1636525309-swapped.png",
-  "Favorites/00144-1636525309-swapped.png",
-  "Favorites/00155-1636525309-swapped.png",
-  "Favorites/00171-1636525309-swapped.png",
-  "Favorites/00186-1636525309-swapped.png",
-  "Favorites/00193-1636525309-swapped.png",
-  "Favorites/00195-1636525309-swapped.png",
-  "Favorites/00202-1636525309-swapped.png",
-  "Favorites/00205-1636525309-swapped.png",
-  "Favorites/00207-1636525309-swapped.png",
-  "Favorites/00219-1636525309-swapped.png",
-  "Favorites/00224-1636525309-swapped.png",
-  "Favorites/00228-1636525309-swapped_04.png",
-  "Favorites/00263-1636525309-swapped.png",
-  "Favorites/00283-1636525309-swapped.png",
-  "Favorites/00289-1636525309-swapped.png",
-  "Favorites/00290-1636525309-swapped.png",
-  "Favorites/00299-1636525309-swapped.png",
-  "Favorites/00303-1636525309-swapped.png",
-  "Favorites/00304-1636525309-swapped.png",
-  "Favorites/00306-1636525309-swapped.png",
-  "Favorites/00308-1636525309-swapped.png",
-  "Favorites/00313-1636525309-swapped.png",
-  "Favorites/00315-1636525309-swapped.png",
-  "Favorites/00318-1636525309-swapped.png"
+  "darkroom.png",
+  "2026-02-22/00008-69661699-swapped.png",
+  "2026-02-22/00009-2917851208-swapped.png",
+  "2026-02-22/00010-2543964626-swapped.png",
+  "2026-02-22/00011-3256863061-swapped.png",
+  "2026-02-22/00012-3709939684-swapped.png",
+  "2026-02-22/00013-2916097743-swapped.png",
+  "2026-02-22/00014-3651048087-swapped.png",
+  "2026-02-22/00015-3696098032-swapped.png",
+  "2026-02-22/00016-3201447583-swapped.png",
+  "2026-02-22/00017-3050293556-swapped.png",
+  "2026-02-22/00018-3815224121-swapped.png",
+  "2026-02-22/00019-805302664-swapped.png",
+  "2026-02-22/00020-1880200199-swapped.png",
+  "2026-02-22/00021-443479391-swapped.png",
+  "2026-02-22/00022-3328320936-swapped.png",
+  "2026-02-22/00023-1947783737-swapped.png",
+  "2026-02-22/00024-3763736570-swapped.png",
+  "2026-02-22/00025-3763736570-swapped.png",
+  "2026-02-22/00026-658943760-swapped.png",
+  "2026-02-22/00027-3763736570-swapped.png",
+  "2026-02-22/00028-3763736570-swapped.png",
+  "2026-02-22/00029-3763736570-swapped.png",
+  "2026-02-22/00030-3763736570-swapped.png",
+  "2026-02-22/00031-3763736570-swapped.png",
+  "2026-02-22/00032-3763736570-swapped.png",
+  "2026-02-22/00033-3763736570-swapped.png",
+  "2026-02-22/00034-3763736570-swapped.png",
+  "2026-02-22/00035-3763736570-swapped.png",
+  "2026-02-22/00036-3763736570-swapped.png",
+  "2026-02-22/00037-3763736570-swapped.png",
+  "2026-02-22/00038-3763736570-swapped.png",
+  "2026-02-22/00039-3763736570-swapped.png",
+  "2026-02-22/00040-3763736570-swapped.png",
+  "2026-02-22/00041-3763736570-swapped.png",
+  "2026-02-22/00042-3763736570-swapped.png",
+  "2026-02-22/00043-3763736570-swapped.png",
+  "2026-02-22/00044-1875760986-swapped.png",
+  "2026-02-22/00045-3763736570-swapped.png",
+  "2026-02-22/00046-3763736570-swapped.png",
+  "2026-02-22/00047-3763736570-swapped.png",
+  "2026-02-22/00048-3763736570-swapped.png",
+  "2026-02-22/00049-3763736570-swapped.png",
+  "2026-02-22/00050-3763736570-swapped.png",
+  "2026-02-22/00051-3763736570-swapped.png",
+  "2026-02-22/00052-3763736570-swapped.png",
+  "2026-02-22/00053-3763736570-swapped.png",
+  "2026-02-22/00054-3763736570-swapped.png",
+  "2026-02-22/00055-3763736570-swapped.png",
+  "2026-02-22/00056-3763736570-swapped.png",
+  "2026-02-22/00057-3763736570-swapped.png",
+  "2026-02-22/00058-3763736570-swapped.png",
+  "2026-02-22/00059-3763736570-swapped.png",
+  "2026-02-22/00060-3763736570-swapped.png",
+  "2026-02-22/00061-3763736570-swapped.png",
+  "2026-02-22/00062-3763736570-swapped.png",
+  "2026-02-22/00063-3038563366-swapped.png",
+  "2026-02-22/00064-3763736570-swapped.png",
+  "2026-02-22/00065-3763736570-swapped.png",
+  "2026-02-22/00066-3763736570-swapped.png",
+  "2026-02-22/00067-3763736570-swapped.png",
+  "2026-02-22/00068-3763736570-swapped.png",
+  "2026-02-22/00069-3763736570-swapped.png",
+  "2026-02-22/00070-3763736570-swapped.png",
+  "2026-02-22/00071-3763736570-swapped.png",
+  "2026-02-22/00072-3763736570-swapped.png",
+  "2026-02-22/00073-3763736570-swapped.png",
+  "2026-02-22/00074-3763736570-swapped.png",
+  "2026-02-22/00075-3763736570-swapped.png",
+  "2026-02-22/00076-3763736570-swapped.png",
+  "2026-02-22/00077-3763736570-swapped.png",
+  "2026-02-22/00078-3763736570-swapped.png",
+  "2026-02-22/00079-3763736570-swapped.png",
+  "2026-02-22/00080-3763736570-swapped.png",
+  "2026-02-22/00081-3763736570-swapped.png",
+  "2026-02-22/00082-1366647251-swapped.png",
+  "2026-02-22/00083-3763736570-swapped.png",
+  "2026-02-22/00084-3763736570-swapped.png",
+  "2026-02-22/00085-3763736570-swapped.png",
+  "2026-02-22/00086-3763736570-swapped.png",
+  "2026-02-22/00087-3763736570-swapped.png",
+  "2026-02-22/00088-3763736570-swapped.png",
+  "2026-02-22/00089-3763736570-swapped.png",
+  "2026-02-22/00090-3763736570-swapped.png",
+  "2026-02-22/00091-3763736570-swapped.png",
+  "2026-02-22/00092-3763736570-swapped.png",
+  "2026-02-22/00093-3763736570-swapped.png",
+  "2026-02-22/00094-3173778759-swapped.png",
+  "2026-02-22/00095-3763736570-swapped.png",
+  "2026-02-22/00096-3763736570-swapped.png",
+  "2026-02-22/00097-3763736570-swapped.png",
+  "2026-02-22/00098-3763736570-swapped.png",
+  "2026-02-22/00099-3763736570-swapped.png",
+  "2026-02-22/00100-3763736570-swapped.png",
+  "2026-02-22/00101-3763736570-swapped.png",
+  "2026-02-22/00102-3763736570-swapped.png",
+  "2026-02-22/00103-3763736570-swapped.png",
+  "2026-02-22/00104-3763736570-swapped.png",
+  "2026-02-22/00105-3763736570-swapped.png",
+  "2026-02-22/00106-3763736570-swapped.png",
+  "2026-02-22/00107-3763736570-swapped.png",
+  "2026-02-22/00108-3763736570-swapped.png",
+  "2026-02-22/00109-2613712102-swapped.png",
+  "2026-02-22/00110-3763736570-swapped.png",
+  "2026-02-22/00111-3763736570-swapped.png",
+  "2026-02-22/00112-3763736570-swapped.png",
+  "2026-02-22/00113-3763736570-swapped.png",
+  "2026-02-22/00114-3763736570-swapped.png",
+  "2026-02-22/00115-3763736570-swapped.png",
+  "2026-02-22/00116-3763736570-swapped.png",
+  "2026-02-22/00117-3763736570-swapped.png",
+  "2026-02-22/00118-3763736570-swapped.png",
+  "2026-02-22/00119-3763736570-swapped.png",
+  "2026-02-22/00120-3890109576-swapped.png",
+  "2026-02-22/00121-3763736570-swapped.png",
+  "2026-02-22/00122-3763736570-swapped.png",
+  "2026-02-22/00123-3763736570-swapped.png",
+  "2026-02-22/00124-3763736570-swapped.png",
+  "2026-02-22/00125-3763736570-swapped.png",
+  "2026-02-22/00126-3763736570-swapped.png",
+  "2026-02-22/00127-3763736570-swapped.png",
+  "2026-02-22/00128-3763736570-swapped.png",
+  "2026-02-22/00129-3763736570-swapped.png",
+  "2026-02-22/00130-3763736570-swapped.png",
+  "2026-02-22/00131-3763736570-swapped.png",
+  "2026-02-22/00132-3763736570-swapped.png",
+  "2026-02-22/00133-3763736570-swapped.png",
+  "2026-02-22/00134-3763736570-swapped.png",
+  "2026-02-22/00135-3763736570-swapped.png",
+  "2026-02-22/00136-3115837679-swapped.png",
+  "2026-02-22/00137-3763736570-swapped.png",
+  "2026-02-22/00138-3763736570-swapped.png",
+  "2026-02-22/00139-3763736570-swapped.png",
+  "2026-02-22/00140-3763736570-swapped.png",
+  "2026-02-22/00141-3763736570-swapped.png",
+  "2026-02-22/00142-3763736570-swapped.png",
+  "2026-02-22/00143-3763736570-swapped.png",
+  "2026-02-22/00144-3763736570-swapped.png",
+  "2026-02-22/00145-3763736570-swapped.png",
+  "2026-02-22/00146-3763736570-swapped.png",
+  "2026-02-22/00147-3763736570-swapped.png",
+  "2026-02-22/00148-3763736570-swapped.png",
+  "2026-02-22/00149-3763736570-swapped.png",
+  "2026-02-22/00150-3763736570-swapped.png",
+  "2026-02-22/00151-3763736570-swapped.png",
+  "2026-02-22/00152-3763736570-swapped.png",
+  "2026-02-22/00153-3763736570-swapped.png",
+  "2026-02-22/00154-3763736570-swapped.png",
+  "2026-02-22/00155-3763736570-swapped.png",
+  "2026-02-22/00156-306574494-swapped.png",
+  "2026-02-22/00157-3763736570-swapped.png",
+  "2026-02-22/00158-3763736570-swapped.png",
+  "2026-02-22/00159-3763736570-swapped.png",
+  "2026-02-22/00160-3763736570-swapped.png",
+  "2026-02-22/00161-3763736570-swapped.png",
+  "2026-02-22/00162-3763736570-swapped.png",
+  "2026-02-22/00163-3763736570-swapped.png",
+  "2026-02-22/00164-3763736570-swapped.png",
+  "2026-02-22/00165-3763736570-swapped.png",
+  "2026-02-22/00166-3763736570-swapped.png",
+  "2026-02-22/00167-3258527815-swapped.png",
+  "2026-02-22/00168-3763736570-swapped.png",
+  "2026-02-22/00169-3763736570-swapped.png",
+  "2026-02-22/00170-3763736570-swapped.png",
+  "2026-02-22/00171-3763736570-swapped.png",
+  "2026-02-22/00172-3763736570-swapped.png",
+  "2026-02-22/00173-3763736570-swapped.png",
+  "2026-02-22/00174-3763736570-swapped.png",
+  "2026-02-22/00175-3763736570-swapped.png",
+  "2026-02-22/00176-3763736570-swapped.png",
+  "2026-02-22/00177-3763736570-swapped.png",
+  "2026-02-22/00178-3763736570-swapped.png",
+  "2026-02-22/00179-3763736570-swapped.png",
+  "2026-02-22/00180-3763736570-swapped.png",
+  "2026-02-22/00181-3906987056-swapped.png",
+  "2026-02-22/00182-3763736570-swapped.png",
+  "2026-02-22/00183-3763736570-swapped.png",
+  "2026-02-22/00184-3763736570-swapped.png",
+  "2026-02-22/00185-3763736570-swapped.png",
+  "2026-02-22/00186-3763736570-swapped.png",
+  "2026-02-22/00187-3763736570-swapped.png",
+  "2026-02-22/00188-3763736570-swapped.png",
+  "2026-02-22/00189-3763736570-swapped.png",
+  "2026-02-22/00190-3763736570-swapped.png",
+  "2026-02-22/00191-3763736570-swapped.png",
+  "2026-02-22/00192-3763736570-swapped.png",
+  "2026-02-22/00193-3763736570-swapped.png",
+  "2026-02-22/00194-3763736570-swapped.png",
+  "2026-02-22/00195-3763736570-swapped.png",
+  "2026-02-22/00196-3763736570-swapped.png",
+  "2026-02-22/00197-3763736570-swapped.png",
+  "2026-02-22/00198-3763736570-swapped.png",
+  "2026-02-22/00199-3763736570-swapped.png",
+  "2026-02-22/00200-3587280850-swapped.png",
+  "2026-02-22/00201-3763736570-swapped.png",
+  "2026-02-22/00202-3763736570-swapped.png",
+  "2026-02-22/00203-3763736570-swapped.png",
+  "2026-02-22/00204-3763736570-swapped.png",
+  "2026-02-22/00205-3763736570-swapped.png",
+  "2026-02-22/00206-3763736570-swapped.png",
+  "2026-02-22/00207-3763736570-swapped.png",
+  "2026-02-22/00208-3763736570-swapped.png",
+  "2026-02-22/00209-3763736570-swapped.png",
+  "2026-02-22/00210-3763736570-swapped.png",
+  "2026-02-22/00211-3763736570-swapped.png",
+  "2026-02-22/00212-3763736570-swapped.png",
+  "2026-02-22/00213-3763736570-swapped.png",
+  "2026-02-22/00214-3763736570-swapped.png",
+  "2026-02-22/00215-3763736570-swapped.png",
+  "2026-02-22/00216-3763736570-swapped.png",
+  "2026-02-22/00217-3763736570-swapped.png",
+  "2026-02-22/00218-3763736570-swapped.png",
+  "2026-02-22/00219-3763736570-swapped.png",
+  "2026-02-22/00220-3763736570-swapped.png",
+  "2026-02-22/00221-2834811007-swapped.png",
+  "2026-02-22/00222-3763736570-swapped.png",
+  "2026-02-22/00223-3763736570-swapped.png",
+  "2026-02-22/00224-3763736570-swapped.png",
+  "2026-02-22/00225-3763736570-swapped.png",
+  "2026-02-22/00226-3763736570-swapped.png",
+  "2026-02-22/00227-3763736570-swapped.png",
+  "2026-02-22/00228-3763736570-swapped.png",
+  "2026-02-22/00229-3763736570-swapped.png",
+  "2026-02-22/00230-3763736570-swapped.png",
+  "2026-02-22/00231-3763736570-swapped.png",
+  "2026-02-22/00232-3763736570-swapped.png",
+  "2026-02-22/00233-3763736570-swapped.png",
+  "2026-02-22/00234-3763736570-swapped.png",
+  "2026-02-22/00235-2252301346-swapped.png",
+  "2026-02-22/00236-3763736570-swapped.png",
+  "2026-02-22/00237-3763736570-swapped.png",
+  "2026-02-22/00238-3763736570-swapped.png",
+  "2026-02-22/00239-3763736570-swapped.png",
+  "2026-02-22/00240-3763736570-swapped.png",
+  "2026-02-22/00241-3763736570-swapped.png",
+  "2026-02-22/00242-3763736570-swapped.png",
+  "2026-02-22/00243-3763736570-swapped.png",
+  "2026-02-22/00244-3763736570-swapped.png",
+  "2026-02-22/00245-3763736570-swapped.png",
+  "2026-02-22/00246-3763736570-swapped.png",
+  "2026-02-22/00247-3763736570-swapped.png",
+  "2026-02-22/00248-3763736570-swapped.png",
+  "2026-02-22/00249-15528634-swapped.png",
+  "2026-02-22/00250-3763736570-swapped.png",
+  "2026-02-22/00251-3763736570-swapped.png",
+  "2026-02-22/00252-3763736570-swapped.png",
+  "2026-02-22/00253-3763736570-swapped.png",
+  "2026-02-22/00254-3763736570-swapped.png",
+  "2026-02-22/00255-3763736570-swapped.png",
+  "2026-02-22/00256-3763736570-swapped.png",
+  "2026-02-22/00257-3763736570-swapped.png",
+  "2026-02-22/00258-3763736570-swapped.png",
+  "2026-02-22/00259-3763736570-swapped.png",
+  "2026-02-22/00260-3763736570-swapped.png",
+  "2026-02-22/00261-3763736570-swapped.png",
+  "2026-02-22/00262-3763736570-swapped.png",
+  "2026-02-22/00263-3763736570-swapped.png",
+  "2026-02-22/00264-3763736570-swapped.png",
+  "2026-02-22/00265-3763736570-swapped.png",
+  "2026-02-22/00266-3763736570-swapped.png",
+  "2026-02-22/00267-3763736570-swapped.png",
+  "2026-02-22/00268-3763736570-swapped.png",
+  "2026-02-22/00269-3763736570-swapped.png",
+  "2026-02-22/00270-3763736570-swapped.png",
+  "2026-02-22/00271-3763736570-swapped.png",
+  "2026-02-22/00272-3763736570-swapped.png",
+  "2026-02-22/00273-2377025470-swapped.png",
+  "2026-02-22/00274-3763736570-swapped.png",
+  "2026-02-22/00275-3763736570-swapped.png",
+  "2026-02-22/00276-3763736570-swapped.png",
+  "2026-02-22/00277-3763736570-swapped.png",
+  "2026-02-22/00278-3763736570-swapped.png",
+  "2026-02-22/00279-3763736570-swapped.png",
+  "2026-02-22/00280-3763736570-swapped.png",
+  "2026-02-22/00281-3763736570-swapped.png",
+  "2026-02-22/00282-3763736570-swapped.png",
+  "2026-02-22/00283-3763736570-swapped.png",
+  "2026-02-22/00284-3763736570-swapped.png",
+  "2026-02-22/00285-3763736570-swapped.png",
+  "2026-02-22/00286-3763736570-swapped.png",
+  "2026-02-22/00287-3763736570-swapped.png",
+  "2026-02-22/00288-3763736570-swapped.png",
+  "2026-02-22/00289-3763736570-swapped.png",
+  "2026-02-22/00290-3763736570-swapped.png",
+  "2026-02-22/00291-3763736570-swapped.png",
+  "2026-02-22/00292-2981751941-swapped.png",
+  "2026-02-22/00293-3763736570-swapped.png"
 ];
     
     // Function to clear all caches and reset state
@@ -5064,15 +5668,15 @@
       if (typeof imageSearchIndex !== 'undefined') imageSearchIndex.clear();
       if (typeof imageDimensionsCache !== 'undefined') imageDimensionsCache.clear();
       if (typeof favoriteOriginalPaths !== 'undefined') favoriteOriginalPaths.clear();
+      if (typeof imageIdToPath !== 'undefined') imageIdToPath.clear();
+      if (typeof pathToImageId !== 'undefined') pathToImageId.clear();
       
       // Clear layout cache
       layoutCache = null;
       
       // Reset state flags
-      if (typeof allMetadataFetched !== 'undefined') allMetadataFetched = false;
       if (typeof metadataFetchInProgress !== 'undefined') metadataFetchInProgress = false;
       if (typeof initialPageLoaded !== 'undefined') initialPageLoaded = false;
-      if (typeof backgroundIndexingScheduled !== 'undefined') backgroundIndexingScheduled = false;
       
       // Clear any pending timeouts
       if (typeof window.finalLayoutTimeout !== 'undefined' && window.finalLayoutTimeout) {
@@ -5102,6 +5706,104 @@
       clearProcessingStatus();
       
       debugLog('[Cache] All caches cleared');
+    }
+
+    function updateFolderUI(pathValue) {
+      currentBaseFolder = pathValue || '';
+      const changeFolderBtn = document.getElementById('changeFolderBtn');
+      const formatTitlePath = (inputPath) => {
+        if (!inputPath) return '';
+        let result = inputPath;
+        if (/^[A-Za-z]:[\\/]/.test(result)) {
+          result = result.substring(2);
+        }
+        if (result && !result.startsWith('\\') && !result.startsWith('/')) {
+          result = '\\' + result;
+        }
+        return result;
+      };
+      const titlePath = formatTitlePath(currentBaseFolder);
+      if (changeFolderBtn) {
+        changeFolderBtn.title = currentBaseFolder
+          ? `Change Folder\n${currentBaseFolder}`
+          : 'Change Folder';
+      }
+      document.title = currentBaseFolder
+        ? `Diffusion Darkroom [ ${titlePath} ]`
+        : 'Diffusion Darkroom';
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.set_title === 'function') {
+        window.pywebview.api.set_title(document.title).catch(() => {});
+      }
+    }
+
+    function showIdleLandingText() {
+      setStartupLandingVisible(true);
+    }
+
+    function setStartupLandingVisible(show) {
+      const landing = document.getElementById('startupLanding');
+      const loadingScreen = document.getElementById('loadingScreen');
+      if (loadingScreen) {
+        loadingScreen.classList.add('hidden');
+      }
+      if (show) {
+        document.body.classList.add('startup-mode');
+        updateFolderUI('');
+      } else {
+        document.body.classList.remove('startup-mode');
+      }
+      if (landing) {
+        if (show) {
+          landing.classList.add('visible');
+        } else {
+          landing.classList.remove('visible');
+        }
+      }
+    }
+
+    async function fetchCurrentBaseFolder() {
+      const response = await fetch('/current-base-folder', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to get current folder: ${response.status}`);
+      }
+      const data = await response.json();
+      updateFolderUI(data.baseFolder || '');
+      return data;
+    }
+
+    async function requestFolderSelection(openPicker = true) {
+      const response = await fetch('/select-base-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(openPicker ? {} : { folder: currentBaseFolder || '' })
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Folder selection failed (${response.status})`);
+      }
+      const data = await response.json();
+      if (data.baseFolder) {
+        updateFolderUI(data.baseFolder);
+      }
+      return data;
+    }
+
+    async function initializeFolderSelectionFlow() {
+      try {
+        // Read current server state for diagnostics/title sync, but do not auto-load.
+        await fetchCurrentBaseFolder();
+      } catch (err) {
+        console.error('Failed to initialize folder selection:', err);
+      }
+      initializeGallery([]);
+      showIdleLandingText();
     }
     
     // Function to initialize/reinitialize the gallery
@@ -5139,7 +5841,8 @@
         debugLog('Updated favorites history for images without original path tracking');
       }
       
-      allImageFiles = imageList;
+      allImageFiles = imageList.map(normalizeImagePath);
+      rebuildImageIdentityMaps(allImageFiles);
       const gallery = document.getElementById('gallery');
       gallery.innerHTML = '';
       allImageContainers = [];
@@ -5149,7 +5852,7 @@
       currentPage = 1;
       
       // Reset filters and sort
-      sortState = { filename: null, date: null };
+      sortState = { field: 'filename', direction: 'asc' };
       showFavoritesOnly = false;
       activeModelFilter = null;
       
@@ -5162,8 +5865,8 @@
       // Reset sort button icons
       updateSortButtonIcons();
       
-      // Initialize image count
-      updateImageCount();
+      // Initialize image count without full-library size scan during startup.
+      updateImageCount(true);
       
       // Initialize pagination - don't create all images upfront
       const totalImages = allImageFiles.length;
@@ -5226,6 +5929,14 @@
         if (data.error) {
           throw new Error(data.error);
         }
+        if (data.baseFolder !== undefined) {
+          updateFolderUI(data.baseFolder || '');
+        }
+        if (!data.baseFolder) {
+          initializeGallery([]);
+          setStartupLandingVisible(true);
+          return;
+        }
         
         if (!data.images || !Array.isArray(data.images)) {
           throw new Error('Invalid response format from server');
@@ -5233,6 +5944,7 @@
         
         // Reinitialize gallery with new image list (this resets everything)
         initializeGallery(data.images);
+        setStartupLandingVisible(false);
         
         // RESTORE preserved state
         // Restore search query
@@ -5245,8 +5957,8 @@
         activeModelFilter = preservedActiveModelFilter;
         activeRatingFilters = preservedActiveRatingFilters;
         
-        // Restore sort state
-        sortState = preservedSortState;
+        // Restore sort state (validated)
+        sortState = normalizeSortState(preservedSortState);
         
         // Restore pagination settings
         imagesPerPage = preservedImagesPerPage;
@@ -5301,46 +6013,12 @@
         // Update sort button icons
         updateSortButtonIcons();
         
-        // Reapply filters and sort (this will update filteredImageFiles and apply sorting)
-        if (preservedSortState.filename !== null) {
-          // Reapply filename sort
-          const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-          const sorted = [...allImageFiles].sort((a, b) => {
-            const aName = getFilenameOnly(a).toLowerCase();
-            const bName = getFilenameOnly(b).toLowerCase();
-            const result = collator.compare(aName, bName);
-            return preservedSortState.filename === 'asc' ? result : -result;
-          });
-          allImageFiles = sorted;
-        } else if (preservedSortState.date !== null) {
-          // Reapply date sort (async - fetch dates in batches like sortByDate does)
-          updateProcessingStatus('Sorting by date...', true);
-          
-          const BATCH_SIZE = 20;
-          const indices = allImageFiles.map((filename, index) => ({ index, filename }));
-          
-          // Fetch dates in batches
-          for (let i = 0; i < indices.length; i += BATCH_SIZE) {
-            const batch = indices.slice(i, i + BATCH_SIZE);
-            await Promise.all(batch.map(async (item) => {
-              item.date = await getFileDate(item.filename);
-            }));
-            
-            // Yield to browser between batches
-            if (i + BATCH_SIZE < indices.length) {
-              await new Promise(resolve => setTimeout(resolve, 0));
-            }
-          }
-          
-          // Sort by date
-          indices.sort((a, b) => {
-            const result = a.date.getTime() - b.date.getTime();
-            return preservedSortState.date === 'asc' ? result : -result;
-          });
-          
-          // Update allImageFiles with sorted order
-          allImageFiles = indices.map(item => item.filename);
-          
+        // Reapply preserved sort before filters/page restore
+        await applyCurrentSortToAllImageFiles({
+          showStatus: sortState.field === 'date',
+          logAction: false,
+        });
+        if (sortState.field === 'date') {
           clearProcessingStatus();
         }
         
@@ -5389,9 +6067,6 @@
           debugLog(`[Reload] Could not update embedded image list: ${updateError.message}`);
         }
         
-        // Restart background metadata indexing
-        startBackgroundMetadataIndexing();
-        
         debugLog(`[Reload] Reloaded ${data.count} images and restored user preferences`);
         logToServer('reload_complete', { count: data.count });
         
@@ -5410,15 +6085,28 @@
       clearAllCaches();
     });
     
-    // Detect browser refresh and trigger image rescan
-    window.addEventListener('pageshow', function(event) {
-      // If page was loaded from cache (back/forward) or is a refresh
-      // and initial load was already completed, trigger reload
-      if (sessionStorage.getItem('darkroomInitialLoadComplete') === 'true') {
-        // This is a reload/refresh, not initial load
-        // Call reloadImages to rescan for deleted images and other changes
-        reloadImages();
-      }
+    function isReloadNavigation() {
+      try {
+        const navEntries = performance.getEntriesByType && performance.getEntriesByType('navigation');
+        if (navEntries && navEntries.length > 0 && navEntries[0] && navEntries[0].type) {
+          return navEntries[0].type === 'reload';
+        }
+      } catch (e) {}
+      try {
+        // Legacy fallback
+        if (performance && performance.navigation) {
+          return performance.navigation.type === 1;
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    // Detect explicit browser refresh and trigger image rescan.
+    // pageshow can fire in other lifecycle cases, so guard hard here.
+    window.addEventListener('pageshow', function() {
+      if (sessionStorage.getItem('darkroomInitialLoadComplete') !== 'true') return;
+      if (!isReloadNavigation()) return;
+      reloadImages();
     });
     
     // Note: Removed visibilitychange handler that was clearing caches on tab switch.
@@ -5462,6 +6150,7 @@
             
             const clickedModel = this.dataset.model;
             const clickedBtn = this;
+            updateProcessingStatus(`Applying ${clickedModel} filter...`, true);
             
             debugLog(`[Model Filter] Button clicked: ${clickedModel}`);
             
@@ -5484,36 +6173,27 @@
               debugLog(`[Model Filter] Activating ${clickedModel} filter...`);
               logToServer('model_filter', { model: clickedModel, action: 'activate' });
               
-              // If metadata is already fetched, apply filter immediately
-              if (allMetadataFetched) {
-                debugLog(`[Model Filter] Metadata ready, applying ${clickedModel} filter...`);
+              // Keep metadata indexing page-scoped for large libraries.
+              try {
+                clickedBtn.classList.add('indexing');
+                updateModelFilterButtonsState(true, 0);
+                
+                debugLog(`[Model Filter] Applying ${clickedModel} filter...`);
+                
+                await fetchAllImageMetadata(false, getCurrentPageFiles());
+                
+                // Re-apply current search filter (which will also apply model filter)
                 const searchInput = document.getElementById('searchInput');
                 filterImages(searchInput ? searchInput.value : '');
+                
+                // Log results
                 debugLog(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
                 logToServer('model_filter_result', { model: clickedModel, resultCount: filteredImageFiles.length });
-              } else {
-                // Need to fetch metadata first
-                try {
-                  clickedBtn.classList.add('indexing');
-                  updateModelFilterButtonsState(true, 0);
-                  
-                  debugLog(`[Model Filter] Applying ${clickedModel} filter...`);
-                  
-                  await fetchAllImageMetadata(false);
-                  
-                  // Re-apply current search filter (which will also apply model filter)
-                  const searchInput = document.getElementById('searchInput');
-                  filterImages(searchInput ? searchInput.value : '');
-                  
-                  // Log results
-                  debugLog(`[Model Filter] Filter applied. Showing ${filteredImageFiles.length} images.`);
-                  logToServer('model_filter_result', { model: clickedModel, resultCount: filteredImageFiles.length });
-                } catch (err) {
-                  console.error('[Model Filter] Error:', err);
-                } finally {
-                  clickedBtn.classList.remove('indexing');
-                  updateModelFilterButtonsState(false);
-                }
+              } catch (err) {
+                console.error('[Model Filter] Error:', err);
+              } finally {
+                clickedBtn.classList.remove('indexing');
+                updateModelFilterButtonsState(false);
               }
             }
           });
@@ -5527,10 +6207,7 @@
         attachModelFilterListeners();
       }, 100);
       
-      initializeGallery(embeddedImageList);
-      
-      // Start background metadata indexing for model filters
-      startBackgroundMetadataIndexing();
+      initializeFolderSelectionFlow();
       
       // Mark that initial load is complete (used to detect browser refresh)
       sessionStorage.setItem('darkroomInitialLoadComplete', 'true');
@@ -5550,7 +6227,41 @@
         if (reloadBtn) {
           reloadBtn.addEventListener('click', reloadImages);
         }
-        
+        const changeFolderBtn = document.getElementById('changeFolderBtn');
+        if (changeFolderBtn) {
+          changeFolderBtn.addEventListener('click', async () => {
+            try {
+              updateProcessingStatus('Opening folder picker...', true);
+              const result = await requestFolderSelection(true);
+              if (result.selected) {
+                await reloadImages();
+              }
+            } catch (err) {
+              console.error('Folder change failed:', err);
+              alert(`Failed to change folder: ${err.message}`);
+            } finally {
+              clearProcessingStatus();
+            }
+          });
+        }
+        const startupSelectFolderBtn = document.getElementById('startupSelectFolder');
+        if (startupSelectFolderBtn) {
+          startupSelectFolderBtn.addEventListener('click', async () => {
+            try {
+              updateProcessingStatus('Opening folder picker...', true);
+              const result = await requestFolderSelection(true);
+              if (result.selected) {
+                setStartupLandingVisible(false);
+                await reloadImages();
+              }
+            } catch (err) {
+              console.error('Startup folder selection failed:', err);
+              alert(`Failed to select folder: ${err.message}`);
+            } finally {
+              clearProcessingStatus();
+            }
+          });
+        }
         // Page size selectors are now set up in initializePaging() function
         // which is called earlier in the initialization sequence
         
@@ -5569,10 +6280,15 @@
         // 2. Show top AND bottom bars if mouse near edges
         // 3. Otherwise hide both
         window.updateBarsVisibility = function() {
+          if (typeof applyScrollbarInsets === 'function') {
+            applyScrollbarInsets();
+          }
           const windowHeight = window.innerHeight;
           const currentMouseY = mouseY < 0 ? windowHeight / 2 : mouseY;
           const nearTop = currentMouseY <= PROXIMITY_THRESHOLD;
           const nearBottom = currentMouseY >= (windowHeight - PROXIMITY_THRESHOLD);
+          const isHoveringTopNav = !!(topNav && topNav.matches(':hover'));
+          const isSliderInteractionActive = window.__ddrSliderInteractionActive === true;
           
           // Check if loading/processing is active
           const loadingBarContainer = document.getElementById('loadingBarContainer');
@@ -5582,7 +6298,7 @@
           const isLoadingOrProcessing = isCurrentlyLoading || isProcessing;
           
           // Determine visibility
-          const showTopBar = nearTop || isLoadingOrProcessing;
+          const showTopBar = nearTop || isLoadingOrProcessing || isHoveringTopNav || isSliderInteractionActive;
           const showBottomBar = nearBottom || isLoadingOrProcessing;
           
           // Apply visibility
@@ -6012,6 +6728,16 @@
     let sizeUpdateRafId = null;
     
     if (sizeSlider) {
+      function updateSizeSliderVisualFill() {
+        const minValue = parseFloat(sizeSlider.min || '0');
+        const maxValue = parseFloat(sizeSlider.max || '1');
+        const currentValue = parseFloat(sizeSlider.value || '0');
+        const range = maxValue - minValue;
+        const ratio = range > 0 ? (currentValue - minValue) / range : 0;
+        const percent = Math.max(0, Math.min(100, ratio * 100));
+        sizeSlider.style.setProperty('--ddr-slider-fill', `${percent}%`);
+      }
+
       // Smooth size update using requestAnimationFrame
       function scheduleSizeUpdate() {
         if (sizeUpdatePending) return;
@@ -6043,25 +6769,36 @@
       // Handle slider mousedown (start dragging)
       sizeSlider.addEventListener('mousedown', function() {
         isDragging = true;
+        window.__ddrSliderInteractionActive = true;
         this.classList.add('dragging');
         updateWidthPopup();
+        if (typeof window.updateBarsVisibility === 'function') {
+          window.updateBarsVisibility();
+        }
       });
       
       // Handle slider mouseup (stop dragging)
       sizeSlider.addEventListener('mouseup', function() {
         isDragging = false;
+        window.__ddrSliderInteractionActive = false;
         this.classList.remove('dragging');
+        if (typeof window.updateBarsVisibility === 'function') {
+          window.updateBarsVisibility();
+        }
       });
       
       // Handle slider mouseleave (stop dragging if mouse leaves)
-      sizeSlider.addEventListener('mouseleave', function() {
+      sizeSlider.addEventListener('mouseleave', function(e) {
+        if (e.buttons === 1) return;
         isDragging = false;
+        window.__ddrSliderInteractionActive = false;
         this.classList.remove('dragging');
       });
       
       // Handle slider input (real-time updates with throttling)
       sizeSlider.addEventListener('input', function() {
         currentSizeMultiplier = parseFloat(this.value);
+        updateSizeSliderVisualFill();
         if (isDragging) {
           updateWidthPopup();
         }
@@ -6072,7 +6809,9 @@
       // Handle slider change (when released)
       sizeSlider.addEventListener('change', function() {
         currentSizeMultiplier = parseFloat(this.value);
+        updateSizeSliderVisualFill();
         isDragging = false;
+        window.__ddrSliderInteractionActive = false;
         this.classList.remove('dragging');
         // Ensure final update is applied
         if (sizeUpdateRafId) {
@@ -6082,6 +6821,31 @@
         debugLog(`[Size] Changed to ${currentSizeMultiplier}x (${Math.round(baseColumnWidth * currentSizeMultiplier)}px)`);
         logToServer('size_change', { multiplier: currentSizeMultiplier, width: Math.round(baseColumnWidth * currentSizeMultiplier) });
       });
+      document.addEventListener('mouseup', function() {
+        if (!isDragging) return;
+        isDragging = false;
+        window.__ddrSliderInteractionActive = false;
+        sizeSlider.classList.remove('dragging');
+        if (typeof window.updateBarsVisibility === 'function') {
+          window.updateBarsVisibility();
+        }
+      });
+
+      updateSizeSliderVisualFill();
+      updateWidthPopup();
+    }
+
+    function stepImageSizeByPixels(pixelDelta) {
+      if (!sizeSlider) return;
+      const minPx = IMAGE_SIZE_SETTINGS.min;
+      const maxPx = IMAGE_SIZE_SETTINGS.max;
+      const currentPx = Math.round(baseColumnWidth * currentSizeMultiplier);
+      const nextPx = Math.max(minPx, Math.min(maxPx, currentPx + pixelDelta));
+      if (nextPx === currentPx) return;
+
+      currentSizeMultiplier = nextPx / baseColumnWidth;
+      sizeSlider.value = String(currentSizeMultiplier);
+      sizeSlider.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     // Sort functionality
@@ -6109,156 +6873,261 @@
       return date;
     }
 
+    function getSortFieldLabel(field) {
+      if (field === 'date') return 'Date';
+      if (field === 'stars') return 'Stars';
+      if (field === 'favorites') return 'Favorites';
+      return 'Filename';
+    }
+
+    function getSortDirectionToken(field, direction) {
+      if (field === 'favorites') {
+        return direction === 'desc' ? 'Last' : 'First';
+      }
+      return direction === 'desc' ? '\u2193' : '\u2191';
+    }
+
+    function getSortStatusMessage() {
+      if (sortState.field === 'date') return 'Sorting by date...';
+      if (sortState.field === 'stars') return 'Sorting by stars...';
+      if (sortState.field === 'favorites') return 'Sorting by favorites...';
+      return 'Sorting by filename...';
+    }
+
+    function normalizeSortState(state) {
+      const normalized = (state && typeof state === 'object') ? { ...state } : {};
+      const validFields = ['filename', 'date', 'stars', 'favorites'];
+      const validDirections = ['asc', 'desc'];
+      if (!validFields.includes(normalized.field)) {
+        normalized.field = 'filename';
+      }
+      if (!validDirections.includes(normalized.direction)) {
+        normalized.direction = 'asc';
+      }
+      return normalized;
+    }
+
     function updateSortButtonIcons() {
-      const filenameBtn = document.getElementById('sortFilename');
-      const dateBtn = document.getElementById('sortDate');
-      
-      // Update filename button
-      if (sortState.filename) {
-        filenameBtn.classList.add('active');
-        const svg = filenameBtn.querySelector('svg');
-        if (sortState.filename === 'asc') {
-          svg.innerHTML = '<path d="M7 10l5 5 5-5z"/>'; // Down arrow
+      const sortControlBtn = document.getElementById('sortControlBtn');
+      const sortControlLabel = document.getElementById('sortControlLabel');
+      if (!sortControlBtn || !sortControlLabel) return;
+
+      const field = sortState.field || 'filename';
+      const direction = sortState.direction === 'desc' ? 'desc' : 'asc';
+      const label = `Sort: ${getSortFieldLabel(field)} ${getSortDirectionToken(field, direction)}`;
+      sortControlLabel.textContent = label;
+      sortControlBtn.classList.add('active');
+      sortControlBtn.setAttribute('title', label);
+
+      document.querySelectorAll('[data-sort-field]').forEach((option) => {
+        if (option.dataset.sortField === field) {
+          option.classList.add('active');
         } else {
-          svg.innerHTML = '<path d="M7 14l5-5 5 5z"/>'; // Up arrow
+          option.classList.remove('active');
         }
-      } else {
-        filenameBtn.classList.remove('active');
-        filenameBtn.querySelector('svg').innerHTML = '<path d="M7 10l5 5 5-5z"/>';
-      }
-      
-      // Update date button
-      if (sortState.date) {
-        dateBtn.classList.add('active');
-        const svg = dateBtn.querySelector('svg');
-        // Calendar icon with arrow overlay
-        if (sortState.date === 'asc') {
-          svg.innerHTML = '<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/><path d="M7 10l5 5 5-5z" transform="translate(5,12)"/>';
+      });
+
+      document.querySelectorAll('[data-sort-direction]').forEach((option) => {
+        if (option.dataset.sortDirection === direction) {
+          option.classList.add('active');
         } else {
-          svg.innerHTML = '<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/><path d="M7 14l5-5 5 5z" transform="translate(5,12)"/>';
+          option.classList.remove('active');
         }
-      } else {
-        dateBtn.classList.remove('active');
-        dateBtn.querySelector('svg').innerHTML = '<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/>';
+      });
+
+      const ascBtn = document.querySelector('[data-sort-direction="asc"]');
+      const descBtn = document.querySelector('[data-sort-direction="desc"]');
+      if (ascBtn && descBtn) {
+        if (field === 'favorites') {
+          ascBtn.textContent = 'Favorites First';
+          descBtn.textContent = 'Favorites Last';
+        } else {
+          ascBtn.textContent = 'Ascending';
+          descBtn.textContent = 'Descending';
+        }
       }
     }
 
-    async function sortByFilename() {
-      // Preserve scroll position
-      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-      
-      // Show processing status
-      updateProcessingStatus('Sorting images...', true);
-      
-      // Toggle sort direction
-      if (sortState.filename === null || sortState.filename === 'desc') {
-        sortState.filename = 'asc';
-        sortState.date = null; // Clear other sort
-      } else {
-        sortState.filename = 'desc';
-      }
-      
-      debugLog(`[Sort] Sorting by filename: ${sortState.filename}`);
-      logToServer('sort', { by: 'filename', direction: sortState.filename });
-      
-      // Optimized sorting: Use Intl.Collator for better performance with numeric sorting
+    async function applyCurrentSortToAllImageFiles(options = {}) {
+      const showStatus = options.showStatus === true;
+      const shouldLog = options.logAction !== false;
+      const field = sortState.field || 'filename';
+      const direction = sortState.direction === 'desc' ? 'desc' : 'asc';
       const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-      const sorted = [...allImageFiles].sort((a, b) => {
-        const aName = getFilenameOnly(a).toLowerCase();
-        const bName = getFilenameOnly(b).toLowerCase();
-        const result = collator.compare(aName, bName);
-        return sortState.filename === 'asc' ? result : -result;
-      });
-      
-      allImageFiles = sorted;
-      
-      // Re-apply all active filters (model, favorites, search) after sorting
-      const searchInput = document.getElementById('searchInput');
-      const searchQuery = searchInput ? searchInput.value : '';
-      filterImages(searchQuery, scrollY);
-      
-      // Update sort button icons
-      updateSortButtonIcons();
-      
-      // Clear processing status after a brief delay
-      setTimeout(() => clearProcessingStatus(), 500);
-    }
 
-    async function sortByDate() {
-      // Preserve scroll position
-      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-      
-      // Show processing status
-      updateProcessingStatus('Sorting by date...', true);
-      
-      // Toggle sort direction
-      if (sortState.date === null || sortState.date === 'desc') {
-        sortState.date = 'asc';
-        sortState.filename = null; // Clear other sort
-      } else {
-        sortState.date = 'desc';
+      if (showStatus) {
+        updateProcessingStatus(getSortStatusMessage(), true);
       }
-      
-      debugLog(`[Sort] Sorting by date: ${sortState.date}`);
-      logToServer('sort', { by: 'date', direction: sortState.date });
-      
-      updateSortButtonIcons();
-      
-      // Fetch dates for all images (with optimized batching)
-      const BATCH_SIZE = 20; // Increased batch size for better performance
-      const indices = allImageFiles.map((filename, index) => ({ index, filename }));
-      
-      // Fetch dates in batches with requestIdleCallback for non-blocking
-      for (let i = 0; i < indices.length; i += BATCH_SIZE) {
-        const batch = indices.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(async (item) => {
-          item.date = await getFileDate(item.filename);
-        }));
-        
-        // Yield to browser between batches
-        if (i + BATCH_SIZE < indices.length) {
-          await new Promise(resolve => {
-            if ('requestIdleCallback' in window) {
-              requestIdleCallback(resolve, { timeout: 100 });
-            } else {
-              setTimeout(resolve, 0);
-            }
-          });
+      if (shouldLog) {
+        logToServer('sort', { by: field, direction });
+      }
+      debugLog(`[Sort] Sorting by ${field}: ${direction}`);
+
+      if (field === 'date') {
+        const BATCH_SIZE = 20;
+        const indices = allImageFiles.map((filename, index) => ({ index, filename }));
+
+        for (let i = 0; i < indices.length; i += BATCH_SIZE) {
+          const batch = indices.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(async (item) => {
+            item.date = await getFileDate(item.filename);
+          }));
+
+          if (i + BATCH_SIZE < indices.length) {
+            await new Promise(resolve => {
+              if ('requestIdleCallback' in window) {
+                requestIdleCallback(resolve, { timeout: 100 });
+              } else {
+                setTimeout(resolve, 0);
+              }
+            });
+          }
         }
+
+        indices.sort((a, b) => {
+          const delta = a.date.getTime() - b.date.getTime();
+          if (delta !== 0) return direction === 'asc' ? delta : -delta;
+          return collator.compare(getPathSortKey(a.filename), getPathSortKey(b.filename));
+        });
+
+        allImageFiles = indices.map(item => item.filename);
+        return;
       }
-      
-      // Sort by date (optimized)
-      indices.sort((a, b) => {
-        const dateA = a.date.getTime();
-        const dateB = b.date.getTime();
-        return sortState.date === 'asc' ? dateA - dateB : dateB - dateA;
+
+      const sorted = [...allImageFiles].sort((a, b) => {
+        let result = 0;
+
+        if (field === 'stars') {
+          const aRating = parseRatingFromFilename(a);
+          const bRating = parseRatingFromFilename(b);
+          result = aRating - bRating;
+        } else if (field === 'favorites') {
+          const aFav = isFavorited(a) ? 1 : 0;
+          const bFav = isFavorited(b) ? 1 : 0;
+          result = bFav - aFav; // ascending = favorites first
+        } else {
+          result = collator.compare(
+            getPathSortKey(a),
+            getPathSortKey(b)
+          );
+        }
+
+        if (result === 0) {
+          result = collator.compare(
+            getFilenameOnly(a).toLowerCase(),
+            getFilenameOnly(b).toLowerCase()
+          );
+        }
+
+        return direction === 'asc' ? result : -result;
       });
-      
-      // Reorder arrays
-      const newFiles = indices.map(item => allImageFiles[item.index]);
-      
-      allImageFiles = newFiles;
-      
-      // Re-apply all active filters (model, favorites, search) after sorting
+
+      allImageFiles = sorted;
+    }
+
+    async function applySortAndRefreshUI(options = {}) {
+      const preserveScroll = options.preserveScroll !== false;
+      const showStatus = options.showStatus !== false;
+      const shouldLog = options.logAction !== false;
+      const scrollY = preserveScroll
+        ? (window.scrollY || window.pageYOffset || document.documentElement.scrollTop)
+        : null;
+
+      await applyCurrentSortToAllImageFiles({ showStatus, logAction: shouldLog });
+
       const searchInput = document.getElementById('searchInput');
       const searchQuery = searchInput ? searchInput.value : '';
       filterImages(searchQuery, scrollY);
-      
-      // Update sort button icons
       updateSortButtonIcons();
-      
-      // Clear processing status after a brief delay
-      setTimeout(() => clearProcessingStatus(), 500);
+
+      if (showStatus) {
+        setTimeout(() => clearProcessingStatus(), 500);
+      }
     }
 
-    // Set up sort button handlers
-    document.getElementById('sortFilename').addEventListener('click', sortByFilename);
-    document.getElementById('sortDate').addEventListener('click', sortByDate);
+    function closeSortPopover() {
+      const popover = document.getElementById('sortPopover');
+      if (popover) popover.classList.remove('open');
+    }
+
+    function setupSortControls() {
+      const sortControl = document.getElementById('sortControl');
+      const sortControlBtn = document.getElementById('sortControlBtn');
+      const sortPopover = document.getElementById('sortPopover');
+      const sortRefreshBtn = document.getElementById('sortRefreshBtn');
+      if (!sortControl || !sortControlBtn || !sortPopover) return;
+
+      sortControlBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        sortPopover.classList.toggle('open');
+      });
+
+      sortPopover.querySelectorAll('[data-sort-field]').forEach((option) => {
+        option.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const newField = option.dataset.sortField;
+          if (!newField) return;
+
+          if (sortState.field !== newField) {
+            sortState.field = newField;
+            sortState.direction = 'asc';
+          }
+
+          closeSortPopover();
+          await applySortAndRefreshUI({ preserveScroll: true, showStatus: true, logAction: true });
+        });
+      });
+
+      sortPopover.querySelectorAll('[data-sort-direction]').forEach((option) => {
+        option.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const newDirection = option.dataset.sortDirection;
+          if (!newDirection || (newDirection !== 'asc' && newDirection !== 'desc')) return;
+
+          sortState.direction = newDirection;
+          if (!sortState.field) {
+            sortState.field = 'filename';
+          }
+
+          closeSortPopover();
+          await applySortAndRefreshUI({ preserveScroll: true, showStatus: true, logAction: true });
+        });
+      });
+
+      if (sortRefreshBtn) {
+        sortRefreshBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeSortPopover();
+          await applySortAndRefreshUI({ preserveScroll: true, showStatus: true, logAction: true });
+        });
+      }
+
+      document.addEventListener('click', (e) => {
+        if (!sortControl.contains(e.target)) {
+          closeSortPopover();
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeSortPopover();
+        }
+      });
+
+      updateSortButtonIcons();
+    }
+
+    setupSortControls();
     
     // Favorites filter button
     const favoritesFilterBtn = document.getElementById('favoritesFilter');
     if (favoritesFilterBtn) {
       favoritesFilterBtn.addEventListener('click', function() {
+        updateProcessingStatus('Applying favorites filter...', true);
         showFavoritesOnly = !showFavoritesOnly;
         debugLog(`[Filter] Favorites filter: ${showFavoritesOnly ? 'on' : 'off'}`);
         logToServer('favorites_filter', { enabled: showFavoritesOnly });
@@ -6298,6 +7167,7 @@
         star.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
+          updateProcessingStatus('Applying rating filter...', true);
           const rating = parseInt(this.dataset.rating, 10);
           
           // Toggle rating filter
@@ -6340,7 +7210,7 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         
-        const filename = this.dataset.filename;
+        const filename = resolveCurrentFilename(this.dataset.filename, this);
         if (!filename) {
           if (DEBUG_MODE) console.warn('Lightbox star button: no filename');
           return;
@@ -6349,7 +7219,10 @@
         debugLog('Lightbox star clicked for:', filename);
         
         // Find the corresponding gallery star button
-        const galleryStarButton = document.querySelector(`.star-button[data-filename="${filename}"]`);
+        const imageId = this.dataset.imageId || getImageIdForPath(filename);
+        const galleryStarButton = imageId
+          ? document.querySelector(`.star-button[data-image-id="${imageId}"]`)
+          : document.querySelector(`.star-button[data-filename="${filename}"]`);
         // Use the lightbox button itself if no gallery button found
         const buttonToUpdate = galleryStarButton || this;
         
@@ -6552,6 +7425,21 @@
         } else if (e.key === 'ArrowRight') {
           navigateLightbox('next');
         }
+        return;
+      }
+
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const target = e.target;
+      const tagName = target && target.tagName ? target.tagName.toLowerCase() : '';
+      if (target && (target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select')) {
+        return;
+      }
+
+      e.preventDefault();
+      if (e.key === 'ArrowLeft') {
+        stepImageSizeByPixels(-50);
+      } else {
+        stepImageSizeByPixels(50);
       }
     });
     
@@ -6572,10 +7460,18 @@
     }
     
     // Use capture phase so these fire BEFORE the lightbox click handler
+    prevBtn.addEventListener('mousedown', function(e) {
+      handleNavClick('prev', e);
+    }, true);
+
     prevBtn.addEventListener('click', function(e) {
       handleNavClick('prev', e);
     }, true);
-    
+
+    nextBtn.addEventListener('mousedown', function(e) {
+      handleNavClick('next', e);
+    }, true);
+
     nextBtn.addEventListener('click', function(e) {
       handleNavClick('next', e);
     }, true);
@@ -7096,16 +7992,15 @@
               const tempDiv = document.createElement('div');
               tempDiv.innerHTML = value;
               value = tempDiv.textContent || tempDiv.innerText || value;
-              navigator.clipboard.writeText(value).then(() => {
+              copyTextRobust(value).then((ok) => {
+                if (!ok) return;
                 // Visual feedback
                 const originalText = this.textContent;
                 this.textContent = 'copied!';
                 setTimeout(() => {
                   this.textContent = originalText;
                 }, 1000);
-              }).catch(err => {
-                console.error('Failed to copy:', err);
-              });
+              }).catch(() => {});
             });
           });
         }

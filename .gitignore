@@ -4,3 +4,18 @@ Favorites/
 # Exclude date folders (yyyy-mm-dd format)
 [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 
+# Local image dump folder (not part of repo)
+images - scenery/
+
+# Build artifacts
+source/build/
+build/
+dist/
+distro/
+build-dist/
+__pycache__/
+*.pyc
+
+# Runtime state
+source/app-desktop/ddr-runtime.json
+

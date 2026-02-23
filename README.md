@@ -60,6 +60,7 @@ A fast, feature-rich stand-alone web-based image gallery for AI generated images
 - **Sort:** By filename or date (click to reverse direction)
 - **Favorites & Ratings:** Filter by favorites and/or star rating
 - **Refresh:** Reload images and changes
+- **Folder Picker:** Select/change the active image root folder without restarting
 
 ### Bottom Nav Bar
 - **Images per page:** Select page size
@@ -93,16 +94,49 @@ A fast, feature-rich stand-alone web-based image gallery for AI generated images
 ## Installation
 
 1. Clone the repository and place these files in your image gen output folder:
-   - `darkroom.html`
-   - `process_images.py`
-   - `launch-darkroom.bat` (Windows)
-   - `darkroom.png`
+   - `web-app/ddr.html`
+   - `web-app/ddr.png`
+   - `desktop-app/ddr-engine.py`
+   - `desktop-app/ddr-desktop.py`
+   - `launch-ddr.bat` (Windows web mode)
+   - `launch-ddr-desktop.bat` (Windows desktop mode)
 
-2. Run `launch-darkroom.bat` (Windows) or `python process_images.py` (all platforms).
+2. Run one of these:
+   - **Web mode (default):** `launch-ddr.bat` or `python desktop-app/ddr-engine.py --mode web`
+   - **Desktop mode (Windows):** `launch-ddr-desktop.bat` or `python desktop-app/ddr-desktop.py`
 
 The script scans folders/sub-folders for images, injects the list into the HTML, starts a local web server, and opens the gallery in your browser.
 
 **Note:** Multiple instances can run simultaneously—each uses its own port (8000, 8001, etc.). The HTML file is mostly standalone after initial processing, but a web server is required for metadata extraction due to browser security restrictions.
+
+## Windows Portable Build (PyWebView)
+
+Build a portable desktop app folder (no installer):
+
+1. Install dependencies: `python -m pip install -r desktop-app/requirements-desktop.txt`
+2. Build: `build-ddr-desktop.bat`
+3. Output: `build-dist\dist\ddr-portable`
+4. Run: `build-dist\dist\ddr-portable\ddr.exe`
+
+For best results, run the executable from your image root folder (or set the working directory there before launch).
+
+On first launch, if no folder is selected, the app prompts for an image root folder. You can change it later via the folder button in the top-right toolbar.
+
+## Web/Desktop Sync Workflow
+
+- Keep all product logic in `web-app/ddr.html` and `desktop-app/ddr-engine.py`
+- Keep `desktop-app/ddr-desktop.py` as a thin launcher only (no business rules)
+- Validate both launch paths after changes:
+  - Web mode: sorting, filtering, paging, lightbox, metadata, favorites/ratings/delete
+  - Desktop mode: same behavior and same file operations
+- If behavior diverges, fix shared logic first (not wrapper-specific patches)
+
+### Current Parity Validation (Smoke)
+
+- `python -m py_compile desktop-app/ddr-engine.py desktop-app/ddr-desktop.py` -> pass
+- `python desktop-app/ddr-engine.py --help` -> pass
+- Server lifecycle smoke (`bootstrap -> start_server_thread -> stop_server`) -> pass
+- `python desktop-app/ddr-desktop.py --help` requires `pywebview` to be installed first
 
 ## Behind the Scenes
 
@@ -115,7 +149,7 @@ The script scans folders/sub-folders for images, injects the list into the HTML,
 ### JavaScript Features
 - Intelligent masonry layout with dynamic column calculation and layout caching
 - Lazy loading with background pre-fetching for instant viewing
-- Background metadata indexing for fast filtering
+- Page-scoped metadata indexing for faster large-library browsing
 - Scroll position preservation during layout changes and refreshes
 - Optimized rendering with `requestAnimationFrame` and batched operations
 - Memory-efficient caching of metadata and image data

@@ -1,0 +1,31 @@
+{
+  "web": {
+    "modelFilters": [
+      { "label": "Flux", "containsText": "flux" },
+      { "label": "Qwen", "containsText": "qwen" },
+      { "label": "ZIT", "containsText": "z_image" },
+      { "label": "Wan", "containsText": "wan" },
+      { "label": "XL", "containsText": "xl" },
+      { "label": "Pony", "containsText": "pony" }
+    ],
+    "imageSize": {
+      "min": 300,
+      "max": 1800,
+      "default": 900,
+      "step": 0.1
+    },
+    "paging": {
+      "options": [50, 100, 250, 500],
+      "default": 100
+    },
+    "zoom": {
+      "default": 2
+    },
+    "debugMode": false
+  },
+  "desktop": {
+    "title": "Diffusion Darkroom",
+    "width": 1600,
+    "height": 1000
+  }
+}
